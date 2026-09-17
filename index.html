@@ -1,0 +1,404 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Study Planner — Calendrier</title>
+  <link rel="stylesheet" href="style.css" />
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
+<style>
+/* v21 enhancements */
+:root { color-scheme: light dark; }
+body { transition: background-color .2s ease, color .2s ease; }
+.theme-toggle {
+  display:inline-flex; align-items:center; gap:.45rem; border:1px solid rgba(127,127,127,.35);
+  background:transparent; color:inherit; border-radius:10px; padding:.55rem .8rem; cursor:pointer;
+}
+.day-cell { cursor:pointer; position:relative; }
+.day-cell:hover { outline:2px solid rgba(100,140,255,.25); outline-offset:-2px; }
+.day-cell .day-add-btn {
+  position:absolute; top:8px; right:8px; width:26px; height:26px; border-radius:8px;
+  border:1px solid rgba(127,127,127,.3); background:rgba(127,127,127,.08); cursor:pointer;
+  color:inherit; font-size:16px; line-height:1;
+}
+.day-cell .day-add-btn:hover { background:rgba(127,127,127,.18); }
+.v21-today-btn { margin-left:.45rem; }
+</style>
+
+<style>
+/* v22 theme + calendar interaction */
+html[data-theme="light"] { color-scheme: light; }
+html[data-theme="light"] {
+  --bg:#f5f7fb; --panel:#ffffff; --panel2:#f3f6fa; --panel3:#eef2f7; --border:#d7dee8;
+  --text:#172033; --muted:#667085; --accent:#5367e8; --accent2:#1f9d7a; --offline:#9b761d; --danger:#b42318;
+  --today:#5367e8; --shadow:0 14px 36px rgba(16,24,40,.10);
+}
+html[data-theme="light"] body { background:linear-gradient(180deg,#f7f9fc,#eef2f7); color:var(--text); }
+html[data-theme="light"] .topbar, html[data-theme="light"] .month-strip-wrap { background:rgba(255,255,255,.9); }
+html[data-theme="light"] .card { background:rgba(255,255,255,.96); }
+html[data-theme="light"] .day-cell { background:#fff; border-color:#e3e8ef; }
+html[data-theme="light"] .day-cell.outside { background:#f6f8fb; }
+html[data-theme="light"] .day-cell.weekend { background:#faf7f8; }
+html[data-theme="light"] .weekdays { background:#f4f6f9; }
+html[data-theme="light"] .session-pill { background:#f7f9fc; border-color:#dfe5ec; }
+html[data-theme="light"] .secondary, html[data-theme="light"] .icon-square { background:#fff; color:var(--text); border-color:var(--border); }
+html[data-theme="light"] .month-pill:hover { background:#eef2f7; color:#172033; }
+html[data-theme="light"] .month-pill.active { background:#e9edff; border-color:#aab6f5; color:#172033; }
+.theme-toggle { min-width:94px; }
+.day-cell { cursor:pointer; }
+.day-cell.admin-clickable:hover { box-shadow:inset 0 0 0 2px rgba(83,103,232,.22); }
+.day-add-bar { margin-top:auto; padding-top:7px; }
+.day-add-bar button { width:100%; font-size:10px; padding:6px 8px; border:1px dashed #53627a; background:transparent; color:#8d9aae; }
+.day-add-bar button:hover { color:inherit; border-color:#7384a4; background:rgba(127,127,127,.06); }
+</style>
+
+<style id="v26-dialog-theme-fix">
+/* v26: dialogs/modals now follow the active light/dark theme */
+html[data-theme="light"] dialog .dialog-card,
+html[data-theme="light"] .dialog-card {
+  background:#ffffff !important;
+  color:#172033 !important;
+  border-color:#d7dee8 !important;
+  box-shadow:0 24px 80px rgba(16,24,40,.20) !important;
+}
+html[data-theme="light"] dialog .dialog-card h3,
+html[data-theme="light"] dialog .dialog-card .eyebrow,
+html[data-theme="light"] dialog .dialog-card strong {
+  color:#172033 !important;
+}
+html[data-theme="light"] dialog .dialog-card label {
+  color:#475467 !important;
+}
+html[data-theme="light"] dialog .dialog-card .muted,
+html[data-theme="light"] dialog .dialog-card small,
+html[data-theme="light"] dialog .dialog-card .field-help {
+  color:#667085 !important;
+}
+html[data-theme="light"] dialog .dialog-card input,
+html[data-theme="light"] dialog .dialog-card select,
+html[data-theme="light"] dialog .dialog-card textarea,
+html[data-theme="light"] .manage-toolbar select {
+  background:#ffffff !important;
+  color:#172033 !important;
+  border-color:#cfd7e3 !important;
+}
+html[data-theme="light"] dialog .dialog-card input::placeholder,
+html[data-theme="light"] dialog .dialog-card textarea::placeholder {
+  color:#98a2b3 !important;
+}
+html[data-theme="light"] dialog .dialog-card input:focus,
+html[data-theme="light"] dialog .dialog-card select:focus,
+html[data-theme="light"] dialog .dialog-card textarea:focus {
+  border-color:#5367e8 !important;
+  box-shadow:0 0 0 3px rgba(83,103,232,.10) !important;
+}
+html[data-theme="light"] dialog .close {
+  color:#667085 !important;
+}
+html[data-theme="light"] dialog .secondary {
+  background:#ffffff !important;
+  color:#172033 !important;
+  border-color:#cfd7e3 !important;
+}
+html[data-theme="light"] dialog .dialog-actions .primary {
+  color:#ffffff !important;
+}
+html[data-theme="light"] dialog .message {
+  color:#b42318 !important;
+}
+html[data-theme="light"] dialog .settings-note,
+html[data-theme="light"] dialog .detail-notes {
+  background:#f7f9fc !important;
+  color:#475467 !important;
+  border-color:#d7dee8 !important;
+}
+html[data-theme="light"] dialog .manage-group {
+  background:#f8fafc !important;
+  border-color:#d7dee8 !important;
+}
+html[data-theme="light"] dialog .manage-row {
+  border-top-color:#e4e7ec !important;
+}
+html[data-theme="light"] dialog .manage-row small,
+html[data-theme="light"] dialog .manage-order {
+  color:#667085 !important;
+}
+html[data-theme="light"] dialog .drive-link {
+  background:#eef4ff !important;
+  color:#2457b8 !important;
+  border-color:#bfd3f8 !important;
+}
+html[data-theme="light"] dialog .checkbox-line {
+  color:#475467 !important;
+}
+/* Keep backdrop neutral in both themes */
+dialog::backdrop {
+  background:rgba(15,23,42,.52) !important;
+  backdrop-filter:blur(4px);
+}
+html[data-theme="dark"] dialog .dialog-card {
+  background:#121722 !important;
+  color:#f3f6fa !important;
+}
+html[data-theme="dark"] dialog .dialog-card label {
+  color:#b7c3d1 !important;
+}
+</style>
+
+<style id="v27-timer-styles">
+.study-timer-bar{margin:0 0 10px 0;padding:11px 13px;display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}
+.study-timer-main{display:flex;align-items:center;gap:10px;min-width:0}
+.study-timer-dot{width:9px;height:9px;border-radius:50%;background:#9aa5b5;flex:0 0 auto}
+.study-timer-dot.running{background:#48d5ae;box-shadow:0 0 0 4px rgba(72,213,174,.12)}
+.study-timer-dot.paused{background:#e7bd61;box-shadow:0 0 0 4px rgba(231,189,97,.12)}
+.study-timer-title{font-weight:800;max-width:420px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.study-timer-sub{color:var(--muted);font-size:11px;margin-top:2px}
+.study-timer-clock{font-variant-numeric:tabular-nums;font-weight:900;font-size:22px;letter-spacing:.02em;min-width:92px}
+.study-timer-actions{display:flex;gap:7px;align-items:center;flex-wrap:wrap}
+.timer-start-list{display:grid;gap:7px;max-height:360px;overflow:auto;margin-top:10px}
+.timer-choice{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:10px 11px;border:1px solid var(--border);border-radius:10px;background:var(--panel);color:var(--text);cursor:pointer}
+.timer-choice:hover{border-color:var(--accent);background:var(--panel3)}
+.timer-choice-title{font-weight:800}
+.timer-choice-meta{font-size:10px;color:var(--muted);margin-top:2px}
+.timer-page-question{font-weight:700;margin-bottom:6px}
+html[data-theme="light"] .study-timer-bar{background:#fff!important;border-color:#d7dee8!important;color:#172033!important}
+html[data-theme="light"] .timer-choice{background:#fff!important;color:#172033!important;border-color:#d7dee8!important}
+html[data-theme="light"] .timer-choice:hover{background:#f4f7ff!important}
+</style>
+
+<style id="v28-ui">
+.calendar-subtitle-row{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.calendar-subtitle-row p{margin:0}
+.detail-timer-btn{margin-bottom:6px}
+</style>
+
+<style id="v33-dayoff-ui">
+.day-off-cell{
+  background:rgba(245,158,11,.08)!important;
+  border-color:rgba(245,158,11,.38)!important;
+}
+.day-off-badge{
+  display:inline-flex;align-items:center;gap:4px;
+  padding:3px 7px;border-radius:999px;
+  font-size:10px;font-weight:800;
+  background:#fff4d6;color:#8a5a00;border:1px solid #f1cf7a;
+}
+.day-off-action{
+  font-size:11px;
+  padding:5px 8px;
+  border-radius:8px;
+}
+html[data-theme="dark"] .day-off-badge{
+  background:#3a2d10;color:#ffd77a;border-color:#6b551c;
+}
+html[data-theme="dark"] .day-off-cell{
+  background:rgba(245,158,11,.06)!important;
+}
+</style>
+
+<style id="v36-ui">
+#newCourseBox{margin-top:6px}
+#availableCourseHint{margin:0 0 6px 0}
+#sessionDayOffAction{justify-content:flex-start}
+.dayoff-popup-btn{width:100%;font-weight:800}
+</style>
+</head>
+<body>
+
+  <section id="loginLanding" class="login-landing">
+    <div class="login-card">
+      <div class="brand large"><span class="brand-icon">📚</span><div><strong>Study Planner</strong><span>Gynécologie, obstétrique & autres matières</span></div></div>
+      <h1>Planning d'étude</h1>
+      <p class="muted">Connecte-toi pour administrer le planning, ou continue en lecture seule.</p>
+      <form id="landingLoginForm" class="landing-form">
+        <label>Nom d'utilisateur<input id="landingUsername" autocomplete="username" value="admin" required /></label>
+        <label>Mot de passe<input id="landingPassword" type="password" autocomplete="current-password" required /></label>
+        <div id="landingMessage" class="message"></div>
+        <button class="primary full-btn" type="submit">🔐 Se connecter</button>
+      </form>
+      <button id="viewerBtn" class="secondary full-btn">👁 Continuer en lecture seule</button>
+          </div>
+  </section>
+  <div id="appRoot" class="app-root hidden">
+  <header class="topbar">
+    <div class="brand"><span class="brand-icon">📚</span><div><strong>Study Planner</strong><span>Planning d'étude partagé</span></div></div>
+    <div class="top-actions">
+      <button id="todayBtn" class="secondary">Aujourd'hui</button><button id="undoBtn" class="secondary admin-only" disabled title="Annuler la dernière modification du planning">↶ Annuler</button><button id="themeToggle" class="secondary theme-toggle" type="button" title="Mode automatique">🌓 Auto</button>
+      <span id="adminState" class="viewer-state">👁 Lecture seule</span>
+      <button id="adminBtn" class="secondary">🔐 Admin</button>
+      <button id="logoutBtn" class="secondary hidden">Déconnexion</button>
+      <button id="changePasswordBtn" class="secondary hidden">Changer le mot de passe</button>
+      <span id="saveState" class="synced">● Synchronisé</span>
+    </div>
+  </header>
+
+  <div class="month-strip-wrap">
+    <div class="month-strip" id="monthStrip"></div>
+  </div>
+
+  <main class="app-shell">
+    <aside class="subject-sidebar card">
+      <div class="sidebar-head">
+        <div><div class="eyebrow">MATIÈRES</div><h2>Mon programme</h2></div>
+        <button id="addSubjectBtn" class="icon-square admin-only" title="Ajouter une matière">＋</button>
+      </div>
+      <div id="subjectList" class="subject-list"></div>
+      <div class="sidebar-footer admin-only">
+        <button id="manageCoursesBtn" class="secondary full-btn">⚙ Gérer les cours</button><button id="restoreOrderBtn" class="secondary full-btn admin-only">↺ Restaurer ordre initial</button>
+        <button id="settingsBtn" class="secondary full-btn">⚙ Paramètres du planning</button>
+      </div>
+    </aside>
+
+    <section class="calendar-area">
+      <div class="calendar-header card">
+        <div>
+          <div class="eyebrow">CALENDRIER MENSUEL</div>
+          <h1 id="monthTitle">Septembre 2026</h1>
+          <div class="calendar-subtitle-row"><p id="monthSubtitle" class="muted">Les séances peuvent être placées n'importe quel jour.</p></div>
+        </div>
+        <div class="calendar-nav">
+          <button id="prevMonth" class="icon-square">←</button>
+          <button id="nextMonth" class="icon-square">→</button>
+        </div>
+      </div>
+      <div class="calendar card">
+        <div class="weekdays"><div>Lun</div><div>Mar</div><div>Mer</div><div>Jeu</div><div>Ven</div><div class="weekend-head">Sam</div><div class="weekend-head">Dim</div></div>
+        <div id="monthGrid" class="month-grid"></div>
+      </div>
+
+    </section>
+
+    <aside class="right-sidebar">
+      <section class="card focus-card">
+        <div class="eyebrow">VUE RAPIDE</div>
+        <div class="focus-title" id="selectedSubjectTitle">Toutes les matières</div>
+        <div class="focus-stats">
+          <div><span>Cours</span><strong id="focusCourses">0</strong></div>
+          <div><span>Planifiés</span><strong id="focusActive">0</strong></div>
+          <div><span>Terminés</span><strong id="focusDone">0</strong></div>
+        </div>
+        <button id="quickAddBtn" class="primary full-btn admin-only">＋ Planifier une séance</button>
+      </section>
+
+      <section class="card upcoming-card">
+        <div class="section-title-row"><h3>Prochaines séances</h3><span id="upcomingCount" class="muted">0</span></div>
+        <div id="upcomingList" class="upcoming-list"></div>
+      </section>
+
+      <section class="card tip-card">
+        <div class="tip-icon">💡</div>
+        <div><strong>Système flexible</strong><p>Le planning peut contenir plusieurs séances par jour, des séances le week-end et un cours peut être réparti sur plusieurs journées.</p></div>
+      </section>
+    </aside>
+  </main>
+
+  <dialog id="adminDialog"><form id="adminForm" class="dialog-card">
+    <button type="button" class="close" data-close="adminDialog">×</button>
+    <div class="eyebrow">ACCÈS ADMIN</div><h3>Ouvrir le mode administrateur</h3>
+    <p class="muted">Les visiteurs peuvent consulter le planning. Seul l'administrateur peut ajouter, modifier ou supprimer.</p>
+    <label>Nom d'utilisateur<input id="adminUsername" autocomplete="username" value="admin" required /></label>
+    <label>Mot de passe<input id="adminPassword" type="password" autocomplete="current-password" required /></label>
+    <div id="adminMessage" class="message"></div>
+    <div class="dialog-actions"><button type="button" class="secondary" data-close="adminDialog">Annuler</button><button class="primary" type="submit">Entrer en mode admin</button></div>
+  </form></dialog>
+
+  <dialog id="passwordDialog"><form id="passwordForm" class="dialog-card">
+    <button type="button" class="close" data-close="passwordDialog">×</button>
+    <div class="eyebrow">SÉCURITÉ</div><h3>Changer le mot de passe admin</h3>
+    <label>Nouveau mot de passe<input id="newAdminPassword" type="password" /></label>
+    <label>Confirmer<input id="newAdminPassword2" type="password" /></label>
+    <div id="passwordMessage" class="message"></div>
+    <div class="dialog-actions"><button type="button" class="secondary" data-close="passwordDialog">Annuler</button><button class="primary" type="submit">Enregistrer</button></div>
+  </form></dialog>
+
+  
+  <dialog id="timerStartDialog"><div class="dialog-card wide-dialog">
+    <button type="button" class="close" data-close="timerStartDialog">×</button>
+    <div class="eyebrow">CHRONOMÈTRE</div>
+    <h3>Démarrer une session d'étude</h3>
+    <p class="muted">Choisis le cours à étudier. Le chronomètre sera visible par les personnes en lecture seule.</p>
+    <div id="timerChoices" class="timer-start-list"></div>
+  </div></dialog>
+
+  <dialog id="timerEndDialog"><form id="timerEndForm" class="dialog-card">
+    <button type="button" class="close" data-close="timerEndDialog">×</button>
+    <div class="eyebrow">FIN DE SESSION</div>
+    <h3>Enregistrer la session d'étude</h3>
+    <p id="timerEndSummary" class="muted"></p>
+    <label class="timer-page-question">À quelle page / diapo t'es-tu arrêté ?
+      <input id="timerPageNumber" type="number" min="1" step="1" placeholder="Ex. 42" />
+    </label>
+    <label>Note de fin (facultatif)
+      <textarea id="timerEndNote" rows="3" placeholder="Point à reprendre, question, remarque…"></textarea>
+    </label>
+    <div id="timerEndMessage" class="message"></div>
+    <div class="dialog-actions">
+      <button type="button" class="secondary" data-close="timerEndDialog">Annuler</button>
+      <button type="submit" class="primary">Enregistrer et arrêter</button>
+    </div>
+  </form></dialog>
+
+  <dialog id="sessionDialog"><form id="sessionForm" class="dialog-card">
+    <button type="button" class="close" data-close="sessionDialog">×</button>
+    <div class="eyebrow">SÉANCE</div><h3 id="sessionDialogTitle">Planifier un cours</h3>
+    <input type="hidden" id="sessionId" />
+    <label>Cours<select id="courseSelect" required></select></label>
+    <div id="availableCourseHint" class="settings-note hidden"></div>
+    <div id="newCourseBox" class="settings-note hidden">
+      <strong>Créer un nouveau cours</strong>
+      <div class="two-col">
+        <label>Nom du cours<input id="newCourseName" placeholder="Ex. ECG et troubles du rythme" /></label>
+        <label>Matière<select id="newCourseSubject"></select></label>
+      </div>
+      <label>Professeur / source (facultatif)<input id="newCourseProfessor" placeholder="Ex. Pr Saadi" /></label>
+    </div>
+    <div class="two-col"><label>Date<input id="sessionDate" type="date" required /></label><label>Mode<select id="modeSelect"><option value="online">💻 Online</option><option value="offline">🏥 Offline</option></select></label></div>
+    <label>Jours prévus<input id="plannedDays" type="number" min="1" value="1" /></label>
+    <label>Notes<textarea id="notes" rows="3" placeholder="Compréhension, questions, révision…"></textarea></label>
+    <label class="checkbox-line"><input id="completed" type="checkbox" /> Séance terminée</label>
+    <div id="sessionMessage" class="message"></div>
+    <div id="sessionDayOffAction" class="dialog-actions"></div>
+    <div class="dialog-actions"><button type="button" class="secondary" data-close="sessionDialog">Annuler</button><button type="submit" class="primary">Enregistrer</button></div>
+  </form></dialog>
+
+  <dialog id="subjectDialog"><form id="subjectForm" class="dialog-card">
+    <button type="button" class="close" data-close="subjectDialog">×</button><div class="eyebrow">NOUVELLE MATIÈRE</div><h3>Ajouter une matière</h3>
+    <label>Nom<input id="subjectName" required placeholder="Ex. Cardiologie" /></label>
+    <div class="dialog-actions"><button type="button" class="secondary" data-close="subjectDialog">Annuler</button><button type="submit" class="primary">Ajouter</button></div>
+  </form></dialog>
+
+  <dialog id="manageDialog"><div class="dialog-card wide-dialog">
+    <button type="button" class="close" data-close="manageDialog">×</button><div class="eyebrow">ORGANISATION</div><h3>Gérer les cours et matières</h3>
+    <div class="manage-toolbar"><select id="manageSubjectFilter"></select><button id="addCourseBtn" class="primary" type="button">＋ Ajouter un cours</button></div>
+    <div id="manageCoursesList" class="manage-list"></div>
+  </div></dialog>
+
+  <dialog id="editCourseDialog"><form id="editCourseForm" class="dialog-card">
+    <button type="button" class="close" data-close="editCourseDialog">×</button><div class="eyebrow">COURS</div><h3 id="editCourseTitle">Ajouter un cours</h3>
+    <input type="hidden" id="editCourseId" />
+    <label>Matière<select id="editSubject" required></select></label>
+    <label>Nom du cours<input id="editCourseName" required /></label>
+    <label>Professeur / source<input id="editProfessor" placeholder="Ex. Pr Saadi, UE, autre" /></label>
+    <label>Lien Google Drive<input id="editDriveUrl" type="url" placeholder="https://drive.google.com/..." /><small class="field-help">En admin : colle ici le lien partageable du cours Google Drive. En lecture seule, le lien sera cliquable depuis le cours dans le calendrier.</small></label>
+    <div class="dialog-actions"><button type="button" class="secondary" data-close="editCourseDialog">Annuler</button><button type="submit" class="primary">Enregistrer</button></div>
+  </form></dialog>
+
+  <dialog id="settingsDialog"><form id="settingsForm" class="dialog-card">
+    <button type="button" class="close" data-close="settingsDialog">×</button><div class="eyebrow">PARAMÈTRES</div><h3>Planning</h3>
+    <label>Date de commencement<input id="startDate" type="date" /></label>
+    <label>Jour offline<select id="offlineDay" disabled><option value="0">🔄 Rotation automatique chaque semaine</option></select></label>
+    <div class="settings-note">Chaque semaine, un seul jour de semaine (lundi à vendredi) est choisi automatiquement. Le jour change chaque semaine, sans reprendre le même jour deux semaines de suite. Samedi et dimanche restent disponibles. Une séance peut toujours être forcée manuellement en Online ou Offline.</div>
+    <div id="settingsMessage" class="message"></div>
+    <div class="dialog-actions"><button type="button" class="secondary" data-close="settingsDialog">Fermer</button><button type="submit" class="primary">Enregistrer</button></div>
+  </form></dialog>
+
+  <dialog id="detailDialog"><div class="dialog-card">
+    <button type="button" class="close" data-close="detailDialog">×</button><div id="detailContent"></div>
+    <div class="dialog-actions" id="detailActions"><button type="button" class="secondary" data-close="detailDialog">Fermer</button></div>
+  </div></dialog>
+
+  </div>
+  <script src="app.js"></script>
+</body>
+</html>

@@ -1,0 +1,7 @@
+1. Supabase -> SQL Editor -> New query
+2. Copier tout le supabase.sql -> Run
+3. Ouvrir index.html et tester
+4. Créer un dépôt GitHub
+5. Envoyer index.html + app.js + style.css (+ README)
+6. GitHub -> Settings -> Pages -> main / root -> Save
+7. Ouvrir l'URL GitHub Pages

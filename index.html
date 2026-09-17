@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Study Planner — Calendrier</title>
-  <link rel="stylesheet" href="style.css" />
+  <link rel="stylesheet" href="style.css?v=50" />
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 
 <style>
@@ -269,9 +269,11 @@ html[data-theme="dark"] .day-off-cell{
         </div>
       </div>
       <div class="calendar card">
-        <div class="weekdays"><div>Lun</div><div>Mar</div><div>Mer</div><div>Jeu</div><div>Ven</div><div class="weekend-head">Sam</div><div class="weekend-head">Dim</div></div>
-        <div id="monthGrid" class="month-grid"></div>
-        <div class="calendar-week-hint">↔ Faites glisser horizontalement pour voir les autres jours</div>
+        <div class="calendar-scroll" aria-label="Calendrier défilable horizontalement">
+          <div class="weekdays"><div>Lun</div><div>Mar</div><div>Mer</div><div>Jeu</div><div>Ven</div><div class="weekend-head">Sam</div><div class="weekend-head">Dim</div></div>
+          <div id="monthGrid" class="month-grid"></div>
+        </div>
+        <div class="calendar-week-hint">↔ Glissez horizontalement pour parcourir les jours</div>
       </div>
 
     </section>
@@ -406,6 +408,6 @@ html[data-theme="dark"] .day-off-cell{
   </div></dialog>
 
   </div>
-  <script src="app.js"></script>
+  <script src="app.js?v=50"></script>
 </body>
 </html>

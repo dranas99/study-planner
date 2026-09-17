@@ -719,3 +719,132 @@ html[data-theme="dark"] .day-off-badge-v38{
   .calendar.card .weekdays>div,.calendar.card .day-cell{width:158px!important;min-width:158px!important}
   .calendar.card .month-grid.week-view .day-cell{min-height:370px!important}
 }
+
+
+/* v50 — polished touch-first mobile calendar
+   The calendar has an explicit horizontal scroll viewport and a fixed-width
+   seven-day canvas. This avoids relying on grid overflow behavior that can be
+   inconsistent on mobile Safari. */
+@media (max-width:700px){
+  .calendar.card{
+    overflow:hidden!important;
+    padding:0!important;
+    border-radius:18px;
+    background:var(--panel);
+    box-shadow:0 12px 30px rgba(0,0,0,.18);
+  }
+  .calendar-scroll{
+    display:block!important;
+    width:100%;
+    overflow-x:auto!important;
+    overflow-y:hidden!important;
+    -webkit-overflow-scrolling:touch;
+    overscroll-behavior-x:contain;
+    scroll-snap-type:x proximity;
+    scrollbar-width:thin;
+    scrollbar-color:var(--accent) transparent;
+    touch-action:pan-x pan-y;
+    cursor:grab;
+  }
+  .calendar-scroll:active{cursor:grabbing}
+  .calendar-scroll .weekdays,
+  .calendar-scroll .month-grid{
+    width:1260px!important;
+    min-width:1260px!important;
+    max-width:none!important;
+    grid-template-columns:repeat(7,180px)!important;
+  }
+  .calendar-scroll .weekdays{
+    position:sticky;
+    left:0;
+    z-index:4;
+    background:var(--panel3);
+    border-bottom:1px solid var(--border);
+  }
+  .calendar-scroll .weekdays>div{
+    width:180px!important;
+    min-width:180px!important;
+    min-height:46px;
+    padding:14px 8px!important;
+    font-size:12px!important;
+    font-weight:800;
+    letter-spacing:.08em;
+    scroll-snap-align:start;
+  }
+  .calendar-scroll .day-cell{
+    width:180px!important;
+    min-width:180px!important;
+    min-height:210px!important;
+    padding:10px!important;
+    box-sizing:border-box;
+    overflow:hidden;
+    scroll-snap-align:start;
+    border-right:1px solid var(--border);
+  }
+  .calendar-scroll .month-grid.week-view .day-cell{min-height:430px!important}
+  .calendar-scroll .day-number{min-height:34px}
+  .calendar-scroll .num{font-size:19px!important;font-weight:850}
+  .calendar-scroll .weekday-label{display:none}
+  .calendar-scroll .add-cell{width:34px!important;height:34px!important;border-radius:50%;font-size:19px!important}
+  .calendar-scroll .session-pill{
+    width:100%;box-sizing:border-box;
+    padding:10px!important;
+    margin-bottom:8px;
+    min-height:70px;
+    border-radius:12px;
+  }
+  .calendar-scroll .pill-title{
+    font-size:14px!important;
+    line-height:1.22!important;
+    -webkit-line-clamp:4!important;
+  }
+  .calendar-scroll .pill-meta{font-size:9px!important;gap:4px}
+  .calendar-scroll .mode-badge,
+  .calendar-scroll .pill-drive,
+  .calendar-scroll .done-badge{font-size:8px!important;padding:4px 6px!important}
+  .calendar-scroll .calendar-empty{font-size:10px;line-height:1.35;padding:18px 4px}
+  .calendar-week-hint{
+    display:block!important;
+    position:relative!important;
+    width:100%!important;
+    box-sizing:border-box;
+    padding:9px 12px!important;
+    margin:0!important;
+    text-align:center;
+    font-size:10px!important;
+    font-weight:700;
+    color:var(--muted);
+    background:var(--panel3);
+    border-top:1px solid var(--border);
+  }
+
+  /* Make the calendar header compact and intentional on phones. */
+  .calendar-header{
+    grid-template-columns:minmax(0,1fr) auto!important;
+    min-height:92px;
+    align-items:center;
+    padding:14px!important;
+    background:linear-gradient(145deg,var(--panel),var(--panel2));
+  }
+  .calendar-header .eyebrow{font-size:8px;letter-spacing:.16em}
+  .calendar-header h1{font-size:20px!important;max-width:46vw}
+  .calendar-subtitle-row p{font-size:9px!important}
+  .calendar-tools{gap:7px!important}
+  .calendar-view-toggle{background:var(--panel3);border:1px solid var(--border);border-radius:12px;padding:3px}
+  .view-btn{font-size:10px!important;border-radius:9px!important;padding:8px 11px!important}
+  .calendar-nav .icon-square{width:35px!important;height:35px!important;border-radius:10px}
+}
+
+@media (max-width:390px){
+  .calendar-scroll .weekdays,
+  .calendar-scroll .month-grid{width:1120px!important;min-width:1120px!important;grid-template-columns:repeat(7,160px)!important}
+  .calendar-scroll .weekdays>div,
+  .calendar-scroll .day-cell{width:160px!important;min-width:160px!important}
+  .calendar-scroll .day-cell{min-height:200px!important}
+  .calendar-scroll .month-grid.week-view .day-cell{min-height:410px!important}
+  .calendar-header h1{font-size:18px!important;max-width:44vw}
+}
+
+/* Light theme: keep the mobile calendar airy and high-contrast. */
+html[data-theme="light"] .calendar-scroll .weekdays{background:#f5f7fb}
+html[data-theme="light"] .calendar-week-hint{background:#f5f7fb}

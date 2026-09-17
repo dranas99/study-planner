@@ -570,3 +570,152 @@ html[data-theme="dark"] .day-off-badge-v38{
   }
 }
 @media (min-width:701px){.calendar-week-hint{display:none!important}}
+
+/* v48 — true horizontal calendar on mobile
+   Both MONTH and WEEK views use a horizontally scrollable 7-column canvas.
+   Desktop/tablet layout is unchanged. */
+@media (max-width:700px){
+  .calendar-area{width:100%;min-width:0}
+  .calendar-header{width:100%;box-sizing:border-box;overflow:hidden}
+  .calendar-header>div:first-child{min-width:0;max-width:100%}
+  .calendar-header h1{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .calendar-tools{flex:0 0 auto}
+
+  .calendar.card{overflow-x:auto!important;overflow-y:hidden!important;-webkit-overflow-scrolling:touch;scrollbar-width:thin;overscroll-behavior-x:contain}
+  .calendar.card .weekdays,
+  .calendar.card .month-grid{display:grid;grid-template-columns:repeat(7,150px);width:1050px;min-width:1050px;max-width:none}
+  .calendar.card .weekdays>div{width:150px;min-width:150px;box-sizing:border-box;text-align:center;padding:11px 5px;font-size:11px}
+  .calendar.card .day-cell{width:150px;min-width:150px;box-sizing:border-box;min-height:190px;padding:9px 8px;overflow:hidden}
+  .calendar.card .month-grid.week-view .day-cell{min-height:360px}
+  .calendar.card .weekday-label{display:block;font-size:10px}
+  .calendar.card .num{font-size:16px}
+  .calendar.card .add-cell{width:30px;height:30px;font-size:18px}
+  .calendar.card .session-pill{padding:9px 8px;min-height:62px}
+  .calendar.card .pill-title{font-size:13px;line-height:1.22;-webkit-line-clamp:5}
+  .calendar.card .pill-meta{font-size:9px;gap:4px}
+  .calendar.card .mode-badge,.calendar.card .pill-drive,.calendar.card .done-badge{font-size:8px;padding:3px 5px}
+  .calendar.card .calendar-empty{font-size:9px;line-height:1.25;padding-top:6px}
+  .calendar-week-hint{display:block!important;position:sticky;left:0;width:100%;box-sizing:border-box;padding:8px 10px;font-size:10px;text-align:center}
+
+  /* Keep the horizontal canvas starting at the left edge. */
+  .calendar.card .weekdays>div:first-child,
+  .calendar.card .day-cell:first-child{ }
+}
+@media (max-width:390px){
+  .calendar.card .weekdays,
+  .calendar.card .month-grid{grid-template-columns:repeat(7,140px);width:980px;min-width:980px}
+  .calendar.card .weekdays>div,.calendar.card .day-cell{width:140px;min-width:140px}
+  .calendar.card .month-grid.week-view .day-cell{min-height:330px}
+}
+
+/* v49 — final mobile polish
+   Goal: keep the desktop layout intact while giving phones a clean, touch-first
+   interface. The calendar remains a genuinely horizontal 7-column canvas. */
+@media (max-width:700px){
+  body{font-size:14px;overflow-x:hidden}
+  .topbar{
+    height:auto;min-height:58px;padding:9px 12px;gap:10px;
+    align-items:center;overflow:hidden
+  }
+  .brand{min-width:0;flex:1}
+  .brand-icon{font-size:22px}
+  .brand strong{font-size:16px;white-space:nowrap}
+  .brand span:not(.brand-icon){font-size:9px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .top-actions{
+    flex:0 0 auto;display:flex;gap:6px;flex-wrap:nowrap;overflow-x:auto;
+    max-width:62vw;padding-bottom:1px;scrollbar-width:none
+  }
+  .top-actions::-webkit-scrollbar{display:none}
+  .top-actions button{white-space:nowrap;min-height:38px;padding:8px 10px;font-size:11px}
+  #todayBtn{font-size:0;padding:0;width:38px;min-width:38px}
+  #todayBtn::before{content:'⌂';font-size:18px}
+  #themeToggle{font-size:0;padding:0;width:38px;min-width:38px}
+  #themeToggle::before{content:'◐';font-size:18px}
+  #adminBtn{font-size:0;padding:0;width:38px;min-width:38px}
+  #adminBtn::before{content:'🔐';font-size:16px}
+  #logoutBtn{font-size:0;padding:0;width:38px;min-width:38px}
+  #logoutBtn::before{content:'↪';font-size:18px}
+  #saveState{white-space:nowrap;font-size:9px;padding:6px 8px}
+  .admin-state,.viewer-state{white-space:nowrap;font-size:9px;padding:5px 7px}
+
+  .month-strip-wrap{top:0;position:sticky;z-index:45}
+  .month-strip{padding:7px 10px;justify-content:center}
+  .month-pill.active{min-width:170px}
+
+  .app-shell{gap:10px;margin:10px auto 18px;padding:0 8px}
+  .subject-sidebar{padding:11px;border-radius:15px}
+  .sidebar-head h2{font-size:17px}
+  .subject-list{grid-template-columns:repeat(2,minmax(0,1fr));gap:6px}
+  .subject-btn{min-height:48px;padding:8px 7px;border-radius:10px}
+  .subject-name{font-size:10.5px}
+  .subject-count{font-size:8px}
+  .sidebar-footer{grid-template-columns:repeat(2,minmax(0,1fr));gap:6px}
+  .sidebar-footer button{min-height:40px;font-size:10px;padding:7px 6px}
+
+  .calendar-header{
+    display:grid;grid-template-columns:minmax(0,1fr) auto;
+    padding:11px 12px;gap:8px;border-radius:15px;margin-bottom:7px
+  }
+  .calendar-header h1{font-size:21px;line-height:1.1;margin-top:3px}
+  .calendar-header p{font-size:9px;line-height:1.25}
+  .calendar-tools{width:auto;display:flex;flex-direction:column;align-items:flex-end;gap:6px}
+  .calendar-view-toggle{order:1}
+  .calendar-nav{order:2}
+  .calendar-nav .icon-square{width:36px;height:36px}
+  .view-btn{font-size:10px;padding:7px 10px}
+
+  /* Horizontal day canvas: deliberately wider than the phone viewport. */
+  .calendar.card{
+    border-radius:15px;overflow-x:auto!important;overflow-y:hidden!important;
+    scroll-snap-type:x proximity;scrollbar-width:thin;
+    -webkit-overflow-scrolling:touch;overscroll-behavior-x:contain;
+  }
+  .calendar.card .weekdays,
+  .calendar.card .month-grid{
+    grid-template-columns:repeat(7,168px)!important;
+    width:1176px!important;min-width:1176px!important;max-width:none!important;
+  }
+  .calendar.card .weekdays>div{
+    width:168px!important;min-width:168px!important;padding:10px 6px;font-size:11px;
+    scroll-snap-align:start
+  }
+  .calendar.card .day-cell{
+    width:168px!important;min-width:168px!important;min-height:205px!important;
+    padding:9px 8px;scroll-snap-align:start
+  }
+  .calendar.card .month-grid.week-view .day-cell{min-height:390px!important}
+  .calendar.card .weekday-label{font-size:10px}
+  .calendar.card .num{font-size:17px}
+  .calendar.card .add-cell{width:30px;height:30px;font-size:18px}
+  .calendar.card .session-pill{padding:9px 8px;min-height:66px;border-radius:10px}
+  .calendar.card .pill-title{font-size:13px;line-height:1.2;-webkit-line-clamp:5}
+  .calendar.card .pill-meta{font-size:9px;gap:4px}
+  .calendar.card .mode-badge,.calendar.card .pill-drive,.calendar.card .done-badge{font-size:8px;padding:3px 5px}
+  .calendar-week-hint{
+    position:sticky;left:0;z-index:3;width:100%;
+    background:rgba(14,19,28,.96);padding:8px 10px;font-size:10px;
+    border-top:1px solid var(--border)
+  }
+
+  .right-sidebar{gap:9px}
+  .focus-card,.upcoming-card,.tip-card{padding:12px;border-radius:15px}
+  .focus-title{font-size:18px}
+  .focus-stats{grid-template-columns:repeat(3,1fr);gap:6px}
+  .focus-stats div{padding:8px 7px}
+  .focus-stats strong{font-size:18px}
+  .up-title{font-size:13px}
+  .tip-card{font-size:12px}
+
+  dialog{inset:0;margin:auto}
+  .dialog-card,.wide-dialog{width:calc(100vw - 16px);max-width:calc(100vw - 16px);padding:14px;border-radius:16px}
+  .dialog-actions{position:sticky;bottom:0;padding-top:10px;background:inherit}
+}
+
+@media (max-width:390px){
+  .top-actions{max-width:58vw}
+  .subject-list{grid-template-columns:1fr 1fr}
+  .sidebar-footer{grid-template-columns:1fr}
+  .calendar.card .weekdays,.calendar.card .month-grid{grid-template-columns:repeat(7,158px)!important;width:1106px!important;min-width:1106px!important}
+  .calendar.card .weekdays>div,.calendar.card .day-cell{width:158px!important;min-width:158px!important}
+  .calendar.card .month-grid.week-view .day-cell{min-height:370px!important}
+}

@@ -5,7 +5,7 @@ const sb=window.supabase.createClient(SUPABASE_URL,SUPABASE_ANON_KEY);
 const state={
   subjects:[], courses:[], sessions:[],
   settings:{start_date:'2026-09-17',offline_day:2,allow_weekends:true},
-  month:new Date(2026,8,1), selectedSubject:'all',
+  month:new Date(2026,8,1), selectedSubject:'all', calendarView:(window.innerWidth<=700?'week':'month'), weekAnchor:new Date(2026,8,17),
   adminToken:localStorage.getItem('studyPlannerAdminToken')||'', viewerMode:false,
   timer:{id:1,status:'idle',session_id:null,course_id:null,started_at:null,accumulated_seconds:0},
   timerTicker:null, dayOffs:new Set(), canUndo:false, undoLabel:''
@@ -239,7 +239,24 @@ function renderMonthStrip(){
  $('monthStrip').innerHTML=Array.from({length:12},(_,m)=>{const d=new Date(y,m,1);const active=m===state.month.getMonth();return `<button class="month-pill ${active?'active':''}" onclick="goMonth(${m})"><span class="m-label">${d.toLocaleDateString('fr-FR',{month:'short'})}</span><span class="m-meta">${y}</span></button>`}).join('');
 }
 function goMonth(m){state.month=new Date(state.month.getFullYear(),m,1);render();}
-function navMonth(delta){state.month=new Date(state.month.getFullYear(),state.month.getMonth()+delta,1);render();}
+function navMonth(delta){
+ if(state.calendarView==='week'){
+   const d=new Date(state.weekAnchor); d.setDate(d.getDate()+delta*7); state.weekAnchor=d;
+   state.month=new Date(d.getFullYear(),d.getMonth(),1); render();
+   return;
+ }
+ state.month=new Date(state.month.getFullYear(),state.month.getMonth()+delta,1);
+ state.weekAnchor=new Date(state.month.getFullYear(),state.month.getMonth(),1);
+ render();
+}
+function setCalendarView(view){
+ state.calendarView=view;
+ if(view==='week'){
+   const base=new Date(state.weekAnchor||state.month||new Date());
+   if(!state.weekAnchor || state.weekAnchor.getMonth()!==state.month.getMonth() || state.weekAnchor.getFullYear()!==state.month.getFullYear()) state.weekAnchor=new Date(state.month.getFullYear(),state.month.getMonth(),1);
+ }
+ renderCalendar();
+}
 
 function renderSubjects(){
  const counts={};
@@ -306,23 +323,39 @@ async function toggleDayOff(date){
   if(beforeSnapshot) await recordPlannerAction(isOff?'Annuler un Day Off':'Mettre un Day Off et décaler le planning',beforeSnapshot);
 }
 function addDayOffUI(){}
-function renderCalendar(){ const scheduledCourseCount=new Set(state.sessions.map(s=>String(s.course_id))).size;
- $('monthSubtitle').textContent=`${state.courses.length} cours · ${scheduledCourseCount} planifiés · ${state.sessions.length} séances`;
-
- $('monthTitle').textContent=state.month.toLocaleDateString('fr-FR',{month:'long',year:'numeric'});
- const today=localDate(new Date());
+function weekCells(){
+ const anchor=new Date(state.weekAnchor||new Date());
+ const monday=new Date(anchor); monday.setDate(anchor.getDate()-((anchor.getDay()+6)%7));
+ return Array.from({length:7},(_,i)=>{const d=new Date(monday);d.setDate(monday.getDate()+i);return {d,inside:d.getMonth()===state.month.getMonth()&&d.getFullYear()===state.month.getFullYear()};});
+}
+function calendarDayHtml(d,inside){
+ const ds=localDate(d), weekDay=(d.getDay()+6)%7, weekend=weekDay>=5, todayClass=ds===localDate(new Date())?'today':'';
  const weekdayNames=['Dimanche','Lundi','Mardi','Mercredi','Jeudi','Vendredi','Samedi'];
- $('monthGrid').innerHTML=monthCells().map(({d,inside})=>{
-   const ds=localDate(d), weekDay=(d.getDay()+6)%7, weekend=weekDay>=5, todayClass=ds===today?'today':'';
-   const allDaySessions=state.sessions.filter(s=>s.study_date===ds).filter(s=>state.selectedSubject==='all'||Number(courseById(s.course_id)?.subject_id)===Number(state.selectedSubject));
-   const pills=allDaySessions.map(s=>{const c=courseById(s.course_id);if(!c)return '';const done=s.completed?' done':'';const modeLabel=s.mode==='offline'?'OFFLINE':'ONLINE';const drive=c.drive_url?`<a class="pill-drive" href="${esc(c.drive_url)}" target="_blank" rel="noopener noreferrer" onclick="event.stopPropagation()" title="Ouvrir le cours sur Google Drive">DRIVE</a>`:'';return `<div class="session-pill ${done}" style="--subject-color:${subjectColor(c.subject_id)}" onclick="event.stopPropagation();openSession('${s.id}')"><div class="pill-title">${esc(c.title)}</div><div class="pill-meta"><span class="mode-badge ${s.mode==='offline'?'offline-badge':'online-badge'}">${modeLabel}</span>${drive}${s.completed?'<span class="done-badge">✓</span>':''}</div></div>`}).join('');
-   const isDayOff=state.dayOffs?.has(String(ds));
-   const addButton=isAdmin()&&inside?`<button class="add-cell" type="button" aria-label="Ajouter un cours le ${esc(weekdayNames[d.getDay()])} ${d.getDate()}" title="Ajouter un cours" onclick="event.stopPropagation();openSessionForm('${ds}')">＋</button>`:'';
-   return `<div data-date="${ds}" class="day-cell ${inside?'inside':'outside'} ${weekend?'weekend':''} ${isDayOff?'day-off-cell':''} ${todayClass} ${isAdmin()&&inside?'admin-clickable':''}" ${isAdmin()&&inside?`onclick="openSessionForm('${ds}')" title="Cliquer pour ajouter un cours à cette journée"`:''}>
-     <div class="day-number"><span class="num">${d.getDate()}</span><span class="day-head-right"><span class="weekday-label">${weekdayNames[d.getDay()]}</span>${addButton}</span></div>
-     <div class="day-sessions">${isDayOff?`<span class="day-off-badge-v38">DAY OFF</span>`:''}${pills||`<div class="calendar-empty">${isDayOff?'Aucun cours — journée off':'Aucune séance'}</div>`}</div>
-   </div>`;
- }).join('');
+ const allDaySessions=state.sessions.filter(s=>s.study_date===ds).filter(s=>state.selectedSubject==='all'||Number(courseById(s.course_id)?.subject_id)===Number(state.selectedSubject));
+ const pills=allDaySessions.map(s=>{const c=courseById(s.course_id);if(!c)return '';const done=s.completed?' done':'';const modeLabel=s.mode==='offline'?'OFFLINE':'ONLINE';const drive=c.drive_url?`<a class="pill-drive" href="${esc(c.drive_url)}" target="_blank" rel="noopener noreferrer" onclick="event.stopPropagation()" title="Ouvrir le cours sur Google Drive">DRIVE</a>`:'';return `<div class="session-pill ${done}" style="--subject-color:${subjectColor(c.subject_id)}" onclick="event.stopPropagation();openSession('${s.id}')"><div class="pill-title">${esc(c.title)}</div><div class="pill-meta"><span class="mode-badge ${s.mode==='offline'?'offline-badge':'online-badge'}">${modeLabel}</span>${drive}${s.completed?'<span class="done-badge">✓</span>':''}</div></div>`}).join('');
+ const isDayOff=state.dayOffs?.has(String(ds));
+ const addButton=isAdmin()&&inside?`<button class="add-cell" type="button" aria-label="Ajouter un cours le ${esc(weekdayNames[d.getDay()])} ${d.getDate()}" title="Ajouter un cours" onclick="event.stopPropagation();openSessionForm('${ds}')">＋</button>`:'';
+ return `<div data-date="${ds}" class="day-cell ${inside?'inside':'outside'} ${weekend?'weekend':''} ${isDayOff?'day-off-cell':''} ${todayClass} ${isAdmin()&&inside?'admin-clickable':''}" ${isAdmin()&&inside?`onclick="openSessionForm('${ds}')" title="Cliquer pour ajouter un cours à cette journée"`:''}>
+   <div class="day-number"><span class="num">${d.getDate()}</span><span class="day-head-right"><span class="weekday-label">${weekdayNames[d.getDay()]}</span>${addButton}</span></div>
+   <div class="day-sessions">${isDayOff?`<span class="day-off-badge-v38">DAY OFF</span>`:''}${pills||`<div class="calendar-empty">${isDayOff?'Aucun cours — journée off':'Aucune séance'}</div>`}</div>
+ </div>`;
+}
+function renderCalendar(){
+ const scheduledCourseCount=new Set(state.sessions.map(s=>String(s.course_id))).size;
+ $('monthSubtitle').textContent=`${state.courses.length} cours · ${scheduledCourseCount} planifiés · ${state.sessions.length} séances`;
+ const activeDate=state.calendarView==='week'?(state.weekAnchor||new Date()):state.month;
+ $('monthTitle').textContent=state.calendarView==='week'
+   ? (()=>{const cells=weekCells();const a=cells[0].d,b=cells[6].d;return a.getMonth()===b.getMonth()?`Semaine du ${a.getDate()} au ${b.getDate()} ${a.toLocaleDateString('fr-FR',{month:'long',year:'numeric'})}`:`Semaine du ${a.getDate()} ${a.toLocaleDateString('fr-FR',{month:'short'})} au ${b.getDate()} ${b.toLocaleDateString('fr-FR',{month:'short',year:'numeric'})}`})()
+   : state.month.toLocaleDateString('fr-FR',{month:'long',year:'numeric'});
+ const cells=state.calendarView==='week'?weekCells():monthCells();
+ const grid=$('monthGrid');
+ grid.classList.toggle('week-view',state.calendarView==='week');
+ grid.innerHTML=cells.map(({d,inside})=>calendarDayHtml(d,inside)).join('');
+ document.querySelectorAll('.calendar-view-toggle .view-btn').forEach(b=>b.classList.remove('active'));
+ const activeBtn=$(state.calendarView==='week'?'weekViewBtn':'monthViewBtn'); if(activeBtn)activeBtn.classList.add('active');
+ const prev=$('prevMonth'),next=$('nextMonth');
+ if(prev)prev.title=state.calendarView==='week'?'Semaine précédente':'Mois précédent';
+ if(next)next.title=state.calendarView==='week'?'Semaine suivante':'Mois suivant';
 }
 
 function renderRightSidebar(){
@@ -583,7 +616,7 @@ function wireDialogs(){
 
 
 
-$('prevMonth').onclick=()=>navMonth(-1);$('nextMonth').onclick=()=>navMonth(1);$('undoBtn').onclick=undoLastPlannerAction;$('todayBtn').onclick=()=>{const d=new Date();state.month=new Date(d.getFullYear(),d.getMonth(),1);render()};$('themeToggle').onclick=cycleThemePreference;$('adminBtn').onclick=()=>$('adminDialog').showModal();$('logoutBtn').onclick=logoutAdmin;$('changePasswordBtn').onclick=()=>$('passwordDialog').showModal();$('quickAddBtn').onclick=()=>openSessionForm();$('addSubjectBtn').onclick=()=>{if(adminGuard())$('subjectDialog').showModal()};$('manageCoursesBtn').onclick=openManage;$('restoreOrderBtn').onclick=restoreOriginalOrder;$('settingsBtn').onclick=()=>{if(!adminGuard())return;$('startDate').value=state.settings.start_date||'2026-09-17';const el=$('offlineDay');if(el)el.value='0';$('settingsDialog').showModal()};$('manageSubjectFilter').onchange=renderManageList;$('addCourseBtn').onclick=()=>openEdit();
+$('prevMonth').onclick=()=>navMonth(-1);$('nextMonth').onclick=()=>navMonth(1);$('monthViewBtn').onclick=()=>setCalendarView('month');$('weekViewBtn').onclick=()=>setCalendarView('week');$('undoBtn').onclick=undoLastPlannerAction;$('todayBtn').onclick=()=>{const d=new Date();state.month=new Date(d.getFullYear(),d.getMonth(),1);render()};$('themeToggle').onclick=cycleThemePreference;$('adminBtn').onclick=()=>$('adminDialog').showModal();$('logoutBtn').onclick=logoutAdmin;$('changePasswordBtn').onclick=()=>$('passwordDialog').showModal();$('quickAddBtn').onclick=()=>openSessionForm();$('addSubjectBtn').onclick=()=>{if(adminGuard())$('subjectDialog').showModal()};$('manageCoursesBtn').onclick=openManage;$('restoreOrderBtn').onclick=restoreOriginalOrder;$('settingsBtn').onclick=()=>{if(!adminGuard())return;$('startDate').value=state.settings.start_date||'2026-09-17';const el=$('offlineDay');if(el)el.value='0';$('settingsDialog').showModal()};$('manageSubjectFilter').onchange=renderManageList;$('addCourseBtn').onclick=()=>openEdit();
 
 (async()=>{
   wireDialogs();

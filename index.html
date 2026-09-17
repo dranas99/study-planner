@@ -257,9 +257,15 @@ html[data-theme="dark"] .day-off-cell{
           <h1 id="monthTitle">Septembre 2026</h1>
           <div class="calendar-subtitle-row"><p id="monthSubtitle" class="muted">Les séances peuvent être placées n'importe quel jour.</p></div>
         </div>
-        <div class="calendar-nav">
-          <button id="prevMonth" class="icon-square">←</button>
-          <button id="nextMonth" class="icon-square">→</button>
+        <div class="calendar-tools">
+          <div class="calendar-view-toggle" role="group" aria-label="Vue du calendrier">
+            <button id="monthViewBtn" class="view-btn active" type="button">Mois</button>
+            <button id="weekViewBtn" class="view-btn" type="button">Semaine</button>
+          </div>
+          <div class="calendar-nav">
+            <button id="prevMonth" class="icon-square" aria-label="Précédent">←</button>
+            <button id="nextMonth" class="icon-square" aria-label="Suivant">→</button>
+          </div>
         </div>
       </div>
       <div class="calendar card">

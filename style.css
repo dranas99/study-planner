@@ -353,3 +353,161 @@ html[data-theme="dark"] .day-off-badge-v38{
 @media (hover:none){
   button:hover,.subject-btn:hover,.session-pill:hover,.upcoming-item:hover{transform:none}
 }
+
+/* v45 — real mobile redesign
+   Mobile gets a compact two-row header, a single active month, compact subject grid,
+   and a readable 7-column calendar. Desktop remains unchanged. */
+@media (max-width:700px){
+  html,body{width:100%;max-width:100%;overflow-x:hidden}
+  body{font-size:14px}
+
+  /* Header: never squeeze controls into one overflowing line. */
+  .topbar{
+    position:sticky;top:0;z-index:50;
+    display:grid;grid-template-columns:1fr;gap:8px;
+    min-height:0;height:auto;padding:10px 12px;
+  }
+  .brand{min-width:0;width:100%;justify-content:flex-start}
+  .brand strong{font-size:17px}
+  .brand span:not(.brand-icon){font-size:10px}
+  .brand-icon{font-size:20px}
+  .top-actions{
+    width:100%;margin:0;display:grid;
+    grid-template-columns:repeat(2,minmax(0,1fr));
+    gap:6px;overflow:visible;justify-content:stretch
+  }
+  .top-actions button,.top-actions .viewer-state,.top-actions .admin-state,#saveState{
+    width:100%;min-width:0;white-space:nowrap;text-align:center;
+    padding:8px 7px;font-size:11px
+  }
+  #todayBtn{grid-column:span 1}
+  #themeToggle{grid-column:span 1}
+  #adminBtn,#logoutBtn{grid-column:span 1}
+  #saveState{grid-column:1/-1;padding:4px 6px}
+  #undoBtn,#changePasswordBtn{display:none!important}
+
+  /* Month navigation is handled by ← / → in the calendar header. */
+  .month-strip-wrap{position:sticky;top:0;z-index:45}
+  .month-strip{justify-content:center;overflow:hidden;padding:6px 12px}
+  .month-pill{display:none!important}
+  .month-pill.active{display:block!important;min-width:150px;padding:6px 12px;border-radius:9px}
+  .month-pill.active .m-label{font-size:13px}
+  .month-pill.active .m-meta{font-size:9px}
+
+  .app-shell{display:flex;flex-direction:column;gap:12px;margin:12px auto 20px;padding:0 10px;width:100%;max-width:100%}
+
+  /* Subjects: compact 2-column selection instead of a wide horizontal strip. */
+  .subject-sidebar{order:1;padding:12px;border-radius:16px;min-width:0;width:100%;overflow:hidden}
+  .sidebar-head{margin-bottom:9px}
+  .sidebar-head h2{font-size:18px}
+  .sidebar-head .eyebrow{font-size:9px}
+  .subject-list{
+    display:grid;grid-template-columns:repeat(2,minmax(0,1fr));
+    gap:7px;overflow:visible;padding:0
+  }
+  .subject-btn{
+    width:100%;min-width:0;min-height:54px;padding:9px 8px;
+    gap:7px;border-radius:11px
+  }
+  .subject-name{font-size:11px;line-height:1.2;overflow:hidden}
+  .subject-count{font-size:9px}
+  .subject-progress-row{min-width:0}
+  .subject-progress-track{min-width:20px}
+  .sidebar-footer{
+    display:grid;grid-template-columns:1fr;gap:6px;
+    margin-top:9px;padding-top:9px;overflow:visible
+  }
+  .sidebar-footer button{width:100%;font-size:11px;padding:8px 9px}
+
+  /* Calendar heading: controls stay beside the month title. */
+  .calendar-area{order:2;width:100%;min-width:0}
+  .calendar-header{padding:12px 13px;margin-bottom:8px;border-radius:16px}
+  .calendar-header h1{font-size:22px;line-height:1.15}
+  .calendar-header p{font-size:9px}
+  .calendar-nav{flex:0 0 auto;gap:5px}
+  .calendar-nav .icon-square{width:38px;height:38px;font-size:18px}
+
+  /* True full-width calendar: 7 equal columns, no horizontal scrolling. */
+  .calendar{width:100%;max-width:100%;overflow:hidden;border-radius:16px}
+  .weekdays,.month-grid{width:100%;min-width:0;max-width:100%;grid-template-columns:repeat(7,minmax(0,1fr))}
+  .weekdays>div{padding:8px 0;font-size:9px;text-align:center}
+  .day-cell{
+    min-width:0;width:100%;min-height:126px;height:auto;
+    padding:5px 3px;overflow:hidden
+  }
+  .day-number{margin-bottom:5px}
+  .weekday-label{display:none}
+  .num{font-size:12px}
+  .add-cell{width:22px;height:22px;font-size:15px;border-radius:7px}
+  .day-sessions{gap:4px;min-width:0}
+  .session-pill{
+    min-width:0;width:100%;padding:6px 4px;border-radius:8px;
+    border-left-width:3px;overflow:hidden
+  }
+  .pill-title{
+    font-size:9px;line-height:1.2;letter-spacing:-.05px;
+    display:-webkit-box;-webkit-line-clamp:5;-webkit-box-orient:vertical;overflow:hidden
+  }
+  .pill-meta{font-size:7px;line-height:1.15;gap:2px;flex-wrap:wrap}
+  .mode-badge,.pill-drive,.done-badge{font-size:6.5px;padding:2px 3px}
+  .calendar-empty{font-size:7px;line-height:1.15}
+
+  /* Right column becomes a normal mobile stack. */
+  .right-sidebar{order:3;width:100%;display:grid;grid-template-columns:1fr;gap:10px}
+  .focus-card,.upcoming-card,.tip-card{padding:13px;border-radius:16px}
+  .focus-title{font-size:19px}
+  .focus-stats{gap:6px}
+  .focus-stats div{padding:8px}
+  .focus-stats strong{font-size:18px}
+  .upcoming-list{gap:7px}
+  .upcoming-item{padding:10px;border-radius:10px}
+  .up-title{font-size:13px}
+  .up-date,.up-subject{font-size:9px}
+
+  /* Dialogs fit iPhone screens and do not cause page overflow. */
+  dialog{width:100%;max-width:100%;padding:0;margin:auto}
+  .dialog-card,.wide-dialog{
+    width:calc(100vw - 20px);min-width:0;max-width:calc(100vw - 20px);
+    max-height:90vh;overflow:auto;padding:15px;border-radius:17px
+  }
+  .dialog-card h3{font-size:18px}
+  .dialog-card input,.dialog-card select,.dialog-card textarea{font-size:16px}
+}
+
+@media (max-width:390px){
+  .top-actions{grid-template-columns:1fr 1fr}
+  .subject-list{grid-template-columns:1fr}
+  .day-cell{min-height:112px;padding:4px 2px}
+  .session-pill{padding:5px 3px}
+  .pill-title{font-size:8px;-webkit-line-clamp:4}
+  .pill-meta{font-size:6.5px}
+  .calendar-header h1{font-size:20px}
+}
+
+/* v46 — mobile calendar view switch: week by default, month on demand. */
+.calendar-tools{display:flex;align-items:center;gap:8px;flex-wrap:wrap;justify-content:flex-end}
+.calendar-view-toggle{display:flex;gap:3px;padding:3px;border:1px solid var(--border);background:var(--panel);border-radius:10px}
+.view-btn{border:0;background:transparent;color:var(--muted);padding:6px 10px;border-radius:7px;font-weight:800;font-size:11px;cursor:pointer}
+.view-btn.active{background:var(--panel3);color:var(--text)}
+.month-grid.week-view{grid-template-columns:repeat(7,minmax(0,1fr))}
+@media (max-width:700px){
+  .calendar-header{align-items:flex-start;gap:8px}
+  .calendar-header>div:first-child{min-width:0;flex:1}
+  .calendar-tools{width:100%;justify-content:space-between;gap:6px}
+  .calendar-view-toggle{order:2}
+  .calendar-nav{order:1}
+  .view-btn{font-size:10px;padding:6px 10px}
+  .month-grid.week-view .day-cell{min-height:300px}
+  .month-grid.week-view .pill-title{font-size:12px;-webkit-line-clamp:6}
+  .month-grid.week-view .pill-meta{font-size:8px}
+  .month-grid.week-view .calendar-empty{font-size:9px}
+  .month-grid.week-view .num{font-size:15px}
+  .month-grid.week-view .add-cell{width:26px;height:26px;font-size:17px}
+}
+@media (max-width:390px){
+  .month-grid.week-view .day-cell{min-height:260px}
+  .month-grid.week-view .pill-title{font-size:11px}
+}
+@media (min-width:701px){
+  .calendar-view-toggle{display:none}
+}

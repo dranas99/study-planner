@@ -231,3 +231,125 @@ html[data-theme="dark"] .day-off-badge-v38{
   color:#ffd66d;
   border-color:#745c25;
 }
+
+/* v44 — mobile-first responsive layout
+   Keeps the same desktop design while making the calendar usable on phones. */
+@media (max-width: 700px){
+  html,body{font-size:13px;overflow-x:hidden}
+  .topbar{
+    min-height:58px;height:auto;padding:8px 10px;gap:8px;align-items:center;
+    flex-wrap:nowrap;overflow:hidden;
+  }
+  .brand{flex:0 0 auto;min-width:0}
+  .brand-icon{font-size:19px}
+  .brand strong{font-size:14px;white-space:nowrap}
+  .brand span:not(.brand-icon){display:none}
+  .top-actions{
+    margin-left:auto;display:flex;flex:1 1 auto;justify-content:flex-end;gap:6px;
+    flex-wrap:nowrap;overflow-x:auto;overflow-y:hidden;scrollbar-width:none;padding-bottom:1px;
+  }
+  .top-actions::-webkit-scrollbar,.month-strip::-webkit-scrollbar,.subject-list::-webkit-scrollbar{display:none}
+  .top-actions button,.top-actions .viewer-state,.top-actions .admin-state,#saveState{
+    flex:0 0 auto;white-space:nowrap;font-size:11px;padding:8px 9px
+  }
+  #undoBtn,#changePasswordBtn{display:none!important}
+  #saveState{font-size:10px}
+  .month-strip-wrap{top:58px}
+  .month-strip{padding:7px 10px;gap:5px}
+  .month-pill{min-width:78px;padding:7px 8px;border-radius:9px}
+  .month-pill .m-label{font-size:11px}
+  .month-pill .m-meta{font-size:9px}
+
+  .app-shell{display:flex;flex-direction:column;gap:10px;margin:10px 0 18px;padding:0 8px}
+  .subject-sidebar{
+    order:1;position:static;height:auto;min-height:0;padding:10px;border-radius:14px;overflow:hidden
+  }
+  .sidebar-head{margin-bottom:7px;align-items:center}
+  .sidebar-head h2{font-size:14px;margin:0}
+  .sidebar-head .eyebrow{font-size:9px}
+  .subject-list{
+    flex-direction:row;overflow-x:auto;overflow-y:hidden;gap:6px;padding:2px 1px 4px;scroll-snap-type:x proximity
+  }
+  .subject-btn{
+    flex:0 0 auto;width:auto;min-width:130px;min-height:46px;padding:8px 9px;scroll-snap-align:start
+  }
+  .subject-name{font-size:11px;line-height:1.15}
+  .subject-count,.subject-progress-pct{font-size:9px}
+  .subject-progress-row{gap:5px}
+  .subject-progress-track{height:4px;min-width:34px}
+  .sidebar-footer{display:flex;overflow-x:auto;gap:6px;margin-top:6px;padding-top:8px}
+  .sidebar-footer button{width:auto;flex:0 0 auto;min-width:max-content;font-size:10px;padding:7px 9px}
+
+  .calendar-area{order:2;min-width:0}
+  .calendar-header{padding:11px 12px;margin-bottom:8px;border-radius:14px;align-items:center}
+  .calendar-header h1{font-size:18px;line-height:1.15}
+  .calendar-header p{font-size:9px;line-height:1.25}
+  .calendar-subtitle-row{gap:6px}
+  .calendar-nav{gap:5px;flex:0 0 auto}
+  .calendar-nav .icon-square{width:32px;height:32px}
+  .calendar{overflow:hidden;border-radius:14px}
+  .weekdays{grid-template-columns:repeat(7,minmax(0,1fr))}
+  .weekdays>div{padding:7px 1px;font-size:9px;text-align:center}
+  .month-grid{min-width:0;width:100%;grid-template-columns:repeat(7,minmax(0,1fr))}
+  .day-cell{
+    min-width:0;min-height:112px;padding:4px 3px;border-right:1px solid #222c3b
+  }
+  .day-number{margin-bottom:4px;gap:2px}
+  .weekday-label{font-size:7px;display:none}
+  .num{font-size:10px}
+  .day-head-right{gap:2px}
+  .add-cell{width:20px;height:20px;font-size:14px;border-radius:6px}
+  .day-sessions{gap:3px}
+  .session-pill{padding:5px 4px;border-radius:7px;min-height:0;border-left-width:3px}
+  .pill-title{font-size:9px;line-height:1.17;-webkit-line-clamp:4;letter-spacing:0}
+  .pill-meta{font-size:7.5px;gap:3px;margin-top:3px;line-height:1.1}
+  .mode-badge,.pill-drive,.done-badge{font-size:6.8px;padding:2px 3px}
+  .calendar-empty{font-size:7px}
+  .day-off-badge-v38,.day-off-badge-v36,.day-off-badge-v34{font-size:7px;padding:2px 4px;margin:2px 0 3px}
+  .day-off-action-v34{font-size:7px;padding:3px 4px}
+  .legend-row{font-size:9px;gap:8px;padding:7px 8px;margin-top:7px}
+
+  .right-sidebar{order:3;display:grid;grid-template-columns:1fr;gap:8px}
+  .focus-card,.upcoming-card,.tip-card{padding:11px;border-radius:14px}
+  .focus-title{font-size:16px;margin:3px 0 9px}
+  .focus-stats{gap:5px;margin-bottom:9px}
+  .focus-stats div{padding:7px;border-radius:8px}
+  .focus-stats strong{font-size:16px}
+  .focus-stats span{font-size:8px}
+  .upcoming-list{gap:5px;margin-top:8px}
+  .upcoming-item{padding:7px;border-radius:8px}
+  .up-date,.up-subject{font-size:8px}
+  .up-title{font-size:11px}
+
+  dialog{width:100%;max-width:100%;margin:auto}
+  .dialog-card,.wide-dialog{width:calc(100vw - 20px);min-width:0;max-width:calc(100vw - 20px);max-height:88vh;border-radius:16px;padding:14px}
+  .dialog-card h3{font-size:17px;margin:4px 0 11px}
+  .dialog-card label{font-size:11px;margin:8px 0}
+  .dialog-card input,.dialog-card select,.dialog-card textarea{font-size:16px;padding:10px}
+  .manage-toolbar{flex-direction:column;align-items:stretch}
+  .manage-row{grid-template-columns:30px minmax(0,1fr);gap:7px;padding:8px}
+  .manage-actions{grid-column:2;justify-content:flex-start}
+  .manage-actions button{font-size:10px;padding:6px 7px}
+  .dialog-actions{flex-wrap:wrap}
+  .dialog-actions button{flex:1 1 120px}
+
+  .login-landing{padding:14px}
+  .login-card{width:min(460px,100%);padding:24px 18px;border-radius:18px}
+  .login-card h1{font-size:25px;margin:20px 0 6px}
+  .brand.large strong{font-size:20px}
+  .brand.large span:last-child{font-size:11px}
+}
+
+@media (max-width:390px){
+  .top-actions #todayBtn{display:none}
+  .month-pill{min-width:72px}
+  .day-cell{min-height:104px;padding:3px 2px}
+  .pill-title{font-size:8px}
+  .pill-meta{font-size:6.5px}
+  .mode-badge,.pill-drive,.done-badge{font-size:6.2px}
+  .subject-btn{min-width:118px}
+}
+
+@media (hover:none){
+  button:hover,.subject-btn:hover,.session-pill:hover,.upcoming-item:hover{transform:none}
+}

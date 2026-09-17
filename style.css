@@ -511,3 +511,62 @@ html[data-theme="dark"] .day-off-badge-v38{
 @media (min-width:701px){
   .calendar-view-toggle{display:none}
 }
+
+/* v47 — mobile horizontal day columns
+   On phones the WEEK view becomes a true horizontal day strip: each day is a
+   readable column, swipe left/right to see the remaining days. Desktop unchanged. */
+@media (max-width:700px){
+  .month-grid.week-view,
+  .weekdays.week-view-head{
+    display:grid;
+    grid-template-columns:repeat(7, 132px);
+    width:max-content;
+    min-width:924px;
+  }
+
+  /* Keep the weekday header aligned with the 7 scrollable day columns. */
+  .calendar.week-horizontal{
+    overflow-x:auto;
+    overflow-y:hidden;
+    -webkit-overflow-scrolling:touch;
+    scrollbar-width:thin;
+  }
+  .calendar.week-horizontal .weekdays,
+  .calendar.week-horizontal .month-grid.week-view{
+    width:max-content;
+    min-width:924px;
+  }
+  .calendar.week-horizontal .weekdays>div{
+    width:132px;
+    box-sizing:border-box;
+    padding:10px 6px;
+    font-size:11px;
+    text-align:center;
+  }
+  .calendar.week-horizontal .month-grid.week-view .day-cell{
+    width:132px;
+    min-width:132px;
+    min-height:320px;
+    padding:8px 7px;
+    box-sizing:border-box;
+    overflow:visible;
+  }
+  .calendar.week-horizontal .weekday-label{display:block;font-size:9px}
+  .calendar.week-horizontal .num{font-size:14px}
+  .calendar.week-horizontal .add-cell{width:26px;height:26px;font-size:17px}
+  .calendar.week-horizontal .session-pill{padding:8px 7px}
+  .calendar.week-horizontal .pill-title{font-size:11px;-webkit-line-clamp:6}
+  .calendar.week-horizontal .pill-meta{font-size:8px;gap:3px}
+  .calendar.week-horizontal .mode-badge,
+  .calendar.week-horizontal .pill-drive,
+  .calendar.week-horizontal .done-badge{font-size:7px;padding:2px 4px}
+  .calendar-week-hint{
+    display:block;
+    padding:7px 10px;
+    color:var(--muted);
+    font-size:10px;
+    text-align:center;
+    border-top:1px solid var(--border);
+  }
+}
+@media (min-width:701px){.calendar-week-hint{display:none!important}}

@@ -350,6 +350,8 @@ function renderCalendar(){
  const cells=state.calendarView==='week'?weekCells():monthCells();
  const grid=$('monthGrid');
  grid.classList.toggle('week-view',state.calendarView==='week');
+ const calendarEl=document.querySelector('.calendar');
+ if(calendarEl){ calendarEl.classList.toggle('week-horizontal',state.calendarView==='week'); }
  grid.innerHTML=cells.map(({d,inside})=>calendarDayHtml(d,inside)).join('');
  document.querySelectorAll('.calendar-view-toggle .view-btn').forEach(b=>b.classList.remove('active'));
  const activeBtn=$(state.calendarView==='week'?'weekViewBtn':'monthViewBtn'); if(activeBtn)activeBtn.classList.add('active');

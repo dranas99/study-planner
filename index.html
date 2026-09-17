@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Study Planner — Calendrier</title>
-  <link rel="stylesheet" href="style.css?v=50" />
+  <link rel="stylesheet" href="style.css?v=51" />
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 
 <style>
@@ -251,6 +251,22 @@ html[data-theme="dark"] .day-off-cell{
     </aside>
 
     <section class="calendar-area">
+      <section id="studyTimerBar" class="card study-timer-bar" aria-live="polite">
+        <div class="study-timer-main">
+          <span id="studyTimerDot" class="study-timer-dot idle"></span>
+          <div class="study-timer-copy">
+            <div id="studyTimerTitle" class="study-timer-title">Aucun chronomètre en cours</div>
+            <div id="studyTimerSub" class="study-timer-sub">L’administrateur peut démarrer une session d’étude.</div>
+          </div>
+        </div>
+        <div class="study-timer-clock" id="studyTimerClock">00:00:00</div>
+        <div class="study-timer-actions">
+          <button id="timerStartBtn" class="secondary admin-only" type="button" onclick="startTimerDialog()">▶ Démarrer</button>
+          <button id="timerPauseBtn" class="secondary admin-only hidden" type="button" onclick="pauseTimer()">⏸ Pause</button>
+          <button id="timerResumeBtn" class="secondary admin-only hidden" type="button" onclick="resumeTimer()">▶ Reprendre</button>
+          <button id="timerEndBtn" class="primary admin-only hidden" type="button" onclick="openTimerEnd()">■ Terminer</button>
+        </div>
+      </section>
       <div class="calendar-header card">
         <div>
           <div class="eyebrow">CALENDRIER MENSUEL</div>
@@ -354,6 +370,7 @@ html[data-theme="dark"] .day-off-cell{
     <input type="hidden" id="sessionId" />
     <label>Cours<select id="courseSelect" required></select></label>
     <div id="availableCourseHint" class="settings-note hidden"></div>
+    <button id="newCourseToggleBtn" type="button" class="secondary full-btn" onclick="toggleNewCourseMode()">＋ Créer un nouveau cours</button>
     <div id="newCourseBox" class="settings-note hidden">
       <strong>Créer un nouveau cours</strong>
       <div class="two-col">
@@ -408,6 +425,6 @@ html[data-theme="dark"] .day-off-cell{
   </div></dialog>
 
   </div>
-  <script src="app.js?v=50"></script>
+  <script src="app.js?v=51"></script>
 </body>
 </html>

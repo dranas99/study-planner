@@ -848,3 +848,21 @@ html[data-theme="dark"] .day-off-badge-v38{
 /* Light theme: keep the mobile calendar airy and high-contrast. */
 html[data-theme="light"] .calendar-scroll .weekdays{background:#f5f7fb}
 html[data-theme="light"] .calendar-week-hint{background:#f5f7fb}
+
+/* v51 — robust timer + touch UI */
+.study-timer-bar{border:1px solid var(--border);background:linear-gradient(135deg,rgba(83,103,232,.10),rgba(72,213,174,.06));box-shadow:0 10px 26px rgba(0,0,0,.12)}
+.study-timer-copy{min-width:0}
+.study-timer-actions button{min-height:38px}
+.study-timer-bar .hidden{display:none!important}
+@media (max-width:700px){
+  .study-timer-bar{margin:0 0 10px!important;padding:12px!important;display:grid!important;grid-template-columns:minmax(0,1fr) auto;gap:10px!important;border-radius:16px!important;position:sticky;top:8px;z-index:20;backdrop-filter:blur(12px)}
+  .study-timer-main{min-width:0;gap:8px}
+  .study-timer-title{max-width:58vw;font-size:13px}
+  .study-timer-sub{font-size:9px;line-height:1.35}
+  .study-timer-clock{font-size:18px;min-width:76px;text-align:right}
+  .study-timer-actions{grid-column:1/-1;display:grid!important;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px;width:100%}
+  .study-timer-actions button{width:100%;font-size:11px!important;padding:9px 8px!important}
+  #availableCourseHint{font-size:11px;line-height:1.4}
+  #newCourseToggleBtn{margin:8px 0}
+  #courseSelect{min-height:44px}
+}

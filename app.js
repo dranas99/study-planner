@@ -8,7 +8,7 @@ const state={
   month:new Date(2026,8,1), selectedSubject:'all', calendarView:(window.innerWidth<=700?'week':'month'), weekAnchor:new Date(2026,8,17),
   adminToken:localStorage.getItem('studyPlannerAdminToken')||'', viewerMode:false,
   timer:{id:1,status:'idle',session_id:null,course_id:null,started_at:null,accumulated_seconds:0},
-  timerTicker:null, dayOffs:new Set(), canUndo:false, undoLabel:''
+  timerTicker:null, timerPollTick:0, dayOffs:new Set(), canUndo:false, undoLabel:''
 };
 const $=id=>document.getElementById(id);
 const pad=n=>String(n).padStart(2,'0');
@@ -78,7 +78,7 @@ async function load(){
  return true;
 }
 
-function render(){renderAdminState();renderMonthStrip();renderSubjects();renderCalendar();renderRightSidebar();}
+function render(){renderAdminState();renderStudyTimer();renderMonthStrip();renderSubjects();renderCalendar();renderRightSidebar();}
 
 function timerSeconds(){
   const t=state.timer||{};
@@ -98,64 +98,98 @@ function timerSession(){return state.sessions.find(s=>String(s.id)===String(stat
 function timerCourse(){const s=timerSession();return courseById(state.timer?.course_id||s?.course_id);}
 function renderStudyTimer(){
   const t=state.timer||{}, s=timerSession(), c=timerCourse();
-  if(!$('studyTimerTitle'))return;
+  if(!$('studyTimerTitle')) return;
   const active=t.status==='running'||t.status==='paused';
   $('studyTimerTitle').textContent=active&&c?c.title:'Aucun chronomètre en cours';
   $('studyTimerSub').textContent=active&&c&&s
-    ? `${subjectName(c.subject_id)} · ${s.study_date} · ${t.status==='running'?'En cours':'En pause'}`
+    ? `${subjectName(c.subject_id)} · ${fmtLong(parseDate(s.study_date))} · ${t.status==='running'?'En cours':'En pause'}`
     : (isAdmin()?'L’administrateur peut démarrer une session d’étude.':'Aucune session chronométrée en cours.');
   $('studyTimerClock').textContent=fmtTimer(timerSeconds());
-  $('studyTimerDot').className=`study-timer-dot ${t.status||''}`;
+  $('studyTimerDot').className=`study-timer-dot ${t.status||'idle'}`;
   $('timerStartBtn')?.classList.toggle('hidden',!isAdmin()||active);
   $('timerPauseBtn')?.classList.toggle('hidden',!isAdmin()||t.status!=='running');
   $('timerResumeBtn')?.classList.toggle('hidden',!isAdmin()||t.status!=='paused');
   $('timerEndBtn')?.classList.toggle('hidden',!isAdmin()||!active);
 }
 function startTimerDialog(){
-  if(!adminGuard())return;
-  const list=state.sessions.filter(s=>!s.completed).sort((a,b)=>a.study_date.localeCompare(b.study_date)||Number(a.course_id)-Number(b.course_id));
+  if(!adminGuard()) return;
+  if(['running','paused'].includes(state.timer?.status)){
+    if(state.timer.status==='paused'){
+      if(confirm('Un chronomètre est en pause. Reprendre celui-ci ?')) resumeTimer();
+      return;
+    }
+    alert('Un chronomètre est déjà en cours. Termine ou mets en pause la session actuelle avant d’en démarrer une autre.');
+    return;
+  }
+  const list=state.sessions
+    .filter(s=>!s.completed)
+    .sort((a,b)=>a.study_date.localeCompare(b.study_date)||String(courseById(a.course_id)?.title||'').localeCompare(String(courseById(b.course_id)?.title||'')));
   $('timerChoices').innerHTML=list.length?list.map(s=>{
     const c=courseById(s.course_id);
-    return `<button type="button" class="timer-choice" onclick="startTimerForSession('${s.id}')"><span><span class="timer-choice-title">${esc(c?.title||'Cours')}</span><span class="timer-choice-meta">${esc(fmtLong(parseDate(s.study_date)))} · ${esc(subjectName(c?.subject_id)||'')}</span></span><span>▶</span></button>`;
-  }).join(''):'<div class="calendar-empty">Aucun cours à étudier. Ajoute d’abord une séance au calendrier.</div>';
+    const duplicateCount=state.sessions.filter(x=>Number(x.course_id)===Number(s.course_id)).length;
+    return `<button type="button" class="timer-choice" onclick="startTimerForSession('${s.id}')"><span><span class="timer-choice-title">${esc(c?.title||'Cours')}</span><span class="timer-choice-meta">${esc(fmtLong(parseDate(s.study_date)))} · ${esc(subjectName(c?.subject_id)||'')} · ${duplicateCount>1?duplicateCount+' séances':''}</span></span><span>▶</span></button>`;
+  }).join(''):'<div class="calendar-empty">Aucune séance à étudier. Ajoute d’abord une séance au calendrier.</div>';
   $('timerStartDialog').showModal();
 }
 async function startTimerForSession(sessionId){
-  if(!adminGuard())return;
-  const {error}=await sb.rpc('admin_timer_start',{p_token:state.adminToken,p_session_id:sessionId});
+  if(!adminGuard()) return;
+  const session=state.sessions.find(s=>String(s.id)===String(sessionId));
+  if(!session){alert('Séance introuvable.');return;}
+  if(session.completed){alert('Cette séance est déjà terminée.');return;}
+  if(['running','paused'].includes(state.timer?.status)){
+    const same=String(state.timer?.session_id)===String(sessionId);
+    if(same && state.timer.status==='paused'){ await resumeTimer(); return; }
+    alert('Un autre chronomètre est déjà actif. Termine-le ou mets-le en pause avant de changer de séance.');
+    return;
+  }
+  setSaveState('● Démarrage du chrono…',true);
+  const {data,error}=await sb.rpc('admin_timer_start',{p_token:state.adminToken,p_session_id:sessionId});
   if(error){adminError(error);return;}
-  $('timerStartDialog').close(); $('detailDialog')?.close(); await load(); render(); ensureTimerTicker();
+  if(data?.status) state.timer={...state.timer,status:data.status,session_id:data.session_id||sessionId,course_id:data.course_id||session.course_id,started_at:data.started_at||new Date().toISOString(),accumulated_seconds:Number(data.accumulated_seconds||0)};
+  $('timerStartDialog')?.close();
+  $('detailDialog')?.close();
+  await load();
+  render();
+  ensureTimerTicker();
+  setSaveState('● Chrono en cours',true);
 }
 async function pauseTimer(){
-  if(!adminGuard())return;
-  const {error}=await sb.rpc('admin_timer_pause',{p_token:state.adminToken});
+  if(!adminGuard()) return;
+  const {data,error}=await sb.rpc('admin_timer_pause',{p_token:state.adminToken});
   if(error){adminError(error);return;}
-  await load();render();
+  if(data?.status) state.timer={...state.timer,status:data.status,started_at:null};
+  renderStudyTimer();
+  await load(); render(); setSaveState('● Chrono en pause',true);
 }
 async function resumeTimer(){
-  if(!adminGuard())return;
-  const {error}=await sb.rpc('admin_timer_resume',{p_token:state.adminToken});
+  if(!adminGuard()) return;
+  const {data,error}=await sb.rpc('admin_timer_resume',{p_token:state.adminToken});
   if(error){adminError(error);return;}
-  await load();render();ensureTimerTicker();
+  if(data?.status) state.timer={...state.timer,status:data.status,started_at:new Date().toISOString()};
+  renderStudyTimer();
+  await load(); render(); ensureTimerTicker(); setSaveState('● Chrono en cours',true);
 }
 function openTimerEnd(){
-  if(!adminGuard())return;
+  if(!adminGuard()) return;
   const c=timerCourse();
-  $('timerEndSummary').textContent=`${c?.title||'Cours'} · temps étudié : ${fmtTimer(timerSeconds())}`;
+  if(!c || !['running','paused'].includes(state.timer?.status)){alert('Aucun chronomètre actif.');return;}
+  $('timerEndSummary').textContent=`${c.title} · temps étudié : ${fmtTimer(timerSeconds())}`;
   $('timerPageNumber').value=''; $('timerEndNote').value=''; $('timerEndMessage').textContent='';
   $('timerEndDialog').showModal();
 }
 async function endTimer(e){
-  e.preventDefault(); if(!adminGuard())return;
+  e.preventDefault(); if(!adminGuard()) return;
   const pageRaw=$('timerPageNumber').value.trim();
   const page=pageRaw?Number(pageRaw):null;
   if(pageRaw && (!Number.isInteger(page)||page<1)){
     $('timerEndMessage').textContent='Indique un numéro de page valide ou laisse le champ vide.'; return;
   }
   const note=$('timerEndNote').value.trim()||null;
-  const {error}=await sb.rpc('admin_timer_end',{p_token:state.adminToken,p_page_number:page,p_note:note});
+  const {data,error}=await sb.rpc('admin_timer_end',{p_token:state.adminToken,p_page_number:page,p_note:note});
   if(error){$('timerEndMessage').textContent=error.message;return;}
-  $('timerEndDialog').close(); await load(); render();
+  $('timerEndDialog').close();
+  await load(); render();
+  setSaveState(`● Session enregistrée (${fmtTimer(Number(data?.studied_seconds||0))})`,true);
 }
 async function refreshTimerOnly(){
   const {data,error}=await sb.from('study_timer_state').select('*').eq('id',1).single();
@@ -165,7 +199,8 @@ function ensureTimerTicker(){
   if(state.timerTicker) return;
   state.timerTicker=setInterval(()=>{
     renderStudyTimer();
-    if(state.timer?.status==='running') refreshTimerOnly();
+    state.timerPollTick=(state.timerPollTick||0)+1;
+    if(state.timerPollTick%5===0) refreshTimerOnly();
   },1000);
 }
 
@@ -386,23 +421,33 @@ function sessionHasCourse(courseId){
  return state.sessions.some(s=>Number(s.course_id)===Number(courseId));
 }
 function fillAvailableCourseSelect(selected){
- const all=state.courses.filter(c=>!sessionHasCourse(c.id));
+ const all=state.courses.slice().sort((a,b)=>(Number(a.global_order||999999)-Number(b.global_order||999999))||(Number(a.sort_order||0)-Number(b.sort_order||0)));
  const select=$('courseSelect');
- select.innerHTML=all.map(c=>`<option value="${c.id}">${esc(c.title)} — ${esc(subjectName(c.subject_id))}</option>`).join('');
- const noCourses=all.length===0;
- $('availableCourseHint').classList.toggle('hidden',!noCourses);
- $('availableCourseHint').innerHTML=noCourses
-   ? 'Aucun cours sans séance. Tu peux créer un nouveau cours ci-dessous.'
-   : `Cours disponibles sans jour attribué : <strong>${all.length}</strong>`;
+ select.innerHTML=all.length
+   ? all.map(c=>{
+       const count=state.sessions.filter(s=>Number(s.course_id)===Number(c.id)).length;
+       const suffix=count>0?` · ${count} séance${count>1?'s':''} déjà planifiée${count>1?'s':''}`:'';
+       return `<option value="${c.id}">${esc(c.title)} — ${esc(subjectName(c.subject_id))}${esc(suffix)}</option>`;
+     }).join('')
+   : '<option value="">Aucun cours existant</option>';
+ $('availableCourseHint').classList.toggle('hidden',all.length===0);
+ $('availableCourseHint').innerHTML=all.length
+   ? 'Tous les cours sont sélectionnables. <strong>Un même cours peut être planifié 2, 3, 10 fois ou plus</strong>, y compris le même jour.'
+   : 'Aucun cours existant. Crée un nouveau cours ci-dessous.';
  if(selected!=null) select.value=String(selected);
  return all;
 }
+
 function fillNewCourseSubjects(){
  $('newCourseSubject').innerHTML=state.subjects.map(s=>`<option value="${s.id}">${esc(s.name)}</option>`).join('');
  if(state.selectedSubject!=='all' && state.subjects.some(s=>String(s.id)===String(state.selectedSubject))) $('newCourseSubject').value=String(state.selectedSubject);
 }
-function toggleNewCourseMode(enabled){
- $('newCourseBox').classList.toggle('hidden',!enabled);
+function toggleNewCourseMode(force){
+ const box=$('newCourseBox');
+ const enabled=typeof force==='boolean'?force:box.classList.contains('hidden');
+ box.classList.toggle('hidden',!enabled);
+ const btn=$('newCourseToggleBtn');
+ if(btn){ btn.textContent=enabled?'✕ Fermer la création':'＋ Créer un nouveau cours'; }
  if(enabled){ fillNewCourseSubjects(); $('newCourseName').focus(); }
 }
 async function createNewCourseForDate(date){
@@ -437,8 +482,6 @@ function openSessionForm(date){
  fillAvailableCourseSelect();
  toggleNewCourseMode(false);
  $('newCourseName').value='';$('newCourseProfessor').value='';
- // If there is no available course, create mode is the natural option.
- if(!state.courses.some(c=>!sessionHasCourse(c.id))) toggleNewCourseMode(true);
  $('sessionDialog').showModal();
 }
 async function saveSession(e){
@@ -448,6 +491,7 @@ async function saveSession(e){
  try{beforeSnapshot=await getPlannerSnapshot();}catch(err){console.warn('Undo snapshot:',err.message)}
  let selectedCourseId=Number($('courseSelect').value||0);
  const newName=$('newCourseName').value.trim();
+ if(!selectedCourseId && !newName){ $('sessionMessage').textContent='Choisis un cours ou crée un nouveau cours.'; return; }
  if(!id && newName){
    const createdId=await createNewCourseForDate($('sessionDate').value);
    if(!createdId){setSaveState('● Erreur',false);return;}
@@ -613,6 +657,7 @@ function wireDialogs(){
  $('subjectForm').addEventListener('submit',saveSubject);
  $('editCourseForm').addEventListener('submit',saveCourse);
  $('settingsForm').addEventListener('submit',saveSettings);
+ $('timerEndForm').addEventListener('submit',endTimer);
 }
 
 

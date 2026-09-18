@@ -185,11 +185,23 @@ async function endTimer(e){
     $('timerEndMessage').textContent='Indique un numéro de page valide ou laisse le champ vide.'; return;
   }
   const note=$('timerEndNote').value.trim()||null;
-  const {data,error}=await sb.rpc('admin_timer_end',{p_token:state.adminToken,p_page_number:page,p_note:note});
+  const t=state.timer||{};
+  const sessionId=t.session_id||null;
+  const clientStartedAt=t.status==='running' ? (t.started_at||null) : null;
+  const clientAccumulatedSeconds=Math.max(0,Number(t.accumulated_seconds||0));
+  const {data,error}=await sb.rpc('admin_timer_end_safe',{
+    p_token:state.adminToken,
+    p_session_id:sessionId,
+    p_page_number:page,
+    p_note:note,
+    p_client_started_at:clientStartedAt,
+    p_client_accumulated_seconds:clientAccumulatedSeconds
+  });
   if(error){$('timerEndMessage').textContent=error.message;return;}
   $('timerEndDialog').close();
   await load(); render();
-  setSaveState(`● Session enregistrée (${fmtTimer(Number(data?.studied_seconds||0))})`,true);
+  const suffix=data?.recovered_from_client?' · synchronisé depuis le navigateur':'';
+  setSaveState(`● Session enregistrée (${fmtTimer(Number(data?.studied_seconds||0))})${suffix}`,true);
 }
 async function refreshTimerOnly(){
   const {data,error}=await sb.from('study_timer_state').select('*').eq('id',1).single();

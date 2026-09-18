@@ -482,11 +482,6 @@ $$;
 
 grant execute on function public.admin_move_course(text,bigint,integer) to anon;
 
--- Remove existing weekend sessions created by the old automatic planner.
--- Weekends will remain empty unless a new session is explicitly added by an admin.
-delete from public.study_sessions_v2
-where extract(isodow from study_date)::integer in (6,7);
-
 -- ============================================================
 -- 8) INTERNAL SCHEDULE REBUILD
 -- ============================================================
@@ -864,9 +859,13 @@ begin
 
   select * into v_session from public.study_sessions_v2 where id=p_session_id;
   if v_session.id is null then raise exception 'Séance introuvable'; end if;
+  if coalesce(v_session.completed,false) then raise exception 'Cette séance est déjà terminée'; end if;
 
-  select * into v_state from public.study_timer_state where id=1;
+  select * into v_state from public.study_timer_state where id=1 for update;
   if v_state.status='running' then raise exception 'Un chronomètre est déjà en cours'; end if;
+  if v_state.status='paused' and v_state.session_id is not null and v_state.session_id<>p_session_id then
+    raise exception 'Un chronomètre en pause est déjà associé à une autre séance. Reprends-le ou termine-le avant de changer de cours.';
+  end if;
 
   update public.study_timer_state
   set status='running',
@@ -957,8 +956,8 @@ declare
   v_now timestamptz:=now();
 begin
   if not public.is_admin_token(p_token) then raise exception 'Session admin invalide'; end if;
-  select * into v_state from public.study_timer_state where id=1;
-  if v_state.session_id is null then raise exception 'Aucune session en cours'; end if;
+  select * into v_state from public.study_timer_state where id=1 for update;
+  if v_state.session_id is null or v_state.status='idle' then raise exception 'Aucune session en cours'; end if;
 
   v_seconds:=coalesce(v_state.accumulated_seconds,0);
 
@@ -985,7 +984,7 @@ begin
   where session_id=v_state.session_id;
 
   update public.study_sessions_v2
-  set duration_min=floor(v_session_seconds/60.0)::integer
+  set duration_min=case when v_session_seconds>0 then greatest(1,ceil(v_session_seconds/60.0)::integer) else 0 end
   where id=v_state.session_id;
 
   update public.study_timer_state
@@ -1015,6 +1014,8 @@ where not exists (
 -- END v27 STUDY TIMER
 -- ============================================================
 
+
+-- v51: timer hardening + duplicate course sessions remain supported.
 
 -- v31: safely ensure every course has at least one session.
 -- No existing session is deleted or modified.
@@ -1963,3 +1964,165 @@ to anon;
 -- ============================================================
 -- END v43 SAFE FINAL SCHEDULING LAYER
 -- ============================================================
+
+-- ============================================================
+-- v52 TIMER RECOVERY / HARDENING
+-- ============================================================
+-- The app can safely finish a timer even if the shared timer-state row was
+-- reset by a stale browser/tab. The server still prefers the authoritative
+-- shared state whenever it is present and matching.
+
+create or replace function public.admin_timer_end_safe(
+  p_token text,
+  p_session_id uuid,
+  p_page_number integer,
+  p_note text,
+  p_client_started_at timestamptz default null,
+  p_client_accumulated_seconds integer default 0
+)
+returns jsonb
+language plpgsql
+security definer
+set search_path = public, extensions, pg_catalog
+as $$
+declare
+  v_state public.study_timer_state%rowtype;
+  v_session public.study_sessions_v2%rowtype;
+  v_seconds integer := 0;
+  v_session_seconds integer := 0;
+  v_now timestamptz := now();
+  v_started_at timestamptz;
+  v_recovered boolean := false;
+begin
+  if not public.is_admin_token(p_token) then
+    raise exception 'Session admin invalide';
+  end if;
+
+  if p_session_id is null then
+    raise exception 'Aucune session de chronomètre sélectionnée';
+  end if;
+
+  select * into v_session
+  from public.study_sessions_v2
+  where id=p_session_id;
+
+  if v_session.id is null then
+    raise exception 'Séance introuvable';
+  end if;
+
+  if coalesce(v_session.completed,false) then
+    raise exception 'Cette séance est déjà terminée';
+  end if;
+
+  select * into v_state
+  from public.study_timer_state
+  where id=1
+  for update;
+
+  -- Preferred path: the shared state is still active and points to this session.
+  if v_state.session_id=p_session_id and v_state.status in ('running','paused') then
+    v_seconds:=greatest(0,coalesce(v_state.accumulated_seconds,0));
+    v_started_at:=v_state.started_at;
+
+    if v_state.status='running' and v_state.started_at is not null then
+      v_seconds:=v_seconds+greatest(0,floor(extract(epoch from (v_now-v_state.started_at)))::integer);
+    end if;
+
+  -- Recovery path: the browser still has a valid active timer, but the shared
+  -- singleton was reset/stale. Use the browser's session and elapsed state,
+  -- then immediately restore the singleton to idle after logging.
+  elsif p_client_started_at is not null or coalesce(p_client_accumulated_seconds,0)>0 then
+    v_seconds:=greatest(0,coalesce(p_client_accumulated_seconds,0));
+    v_started_at:=p_client_started_at;
+    if p_client_started_at is not null then
+      v_seconds:=v_seconds+greatest(0,floor(extract(epoch from (v_now-p_client_started_at)))::integer);
+    end if;
+    v_recovered:=true;
+  else
+    raise exception 'Aucune session en cours';
+  end if;
+
+  insert into public.study_time_logs(
+    session_id,course_id,started_at,ended_at,studied_seconds,page_number,note
+  )
+  values(
+    p_session_id,
+    v_session.course_id,
+    coalesce(v_started_at,v_now),
+    v_now,
+    greatest(0,v_seconds),
+    p_page_number,
+    nullif(trim(coalesce(p_note,'')),'')
+  );
+
+  select coalesce(sum(studied_seconds),0)
+  into v_session_seconds
+  from public.study_time_logs
+  where session_id=p_session_id;
+
+  update public.study_sessions_v2
+  set duration_min=case
+    when v_session_seconds>0 then greatest(1,ceil(v_session_seconds/60.0)::integer)
+    else 0
+  end
+  where id=p_session_id;
+
+  update public.study_timer_state
+  set status='idle',
+      session_id=null,
+      course_id=null,
+      started_at=null,
+      accumulated_seconds=0,
+      updated_at=v_now
+  where id=1;
+
+  return jsonb_build_object(
+    'ok',true,
+    'studied_seconds',greatest(0,v_seconds),
+    'page_number',p_page_number,
+    'recovered_from_client',v_recovered,
+    'session_id',p_session_id
+  );
+end;
+$$;
+
+grant execute on function public.admin_timer_end_safe(text,uuid,integer,text,timestamptz,integer) to anon;
+
+-- Keep the original RPC name functional for existing clients/tabs.
+create or replace function public.admin_timer_end(
+  p_token text,
+  p_page_number integer,
+  p_note text
+)
+returns jsonb
+language plpgsql
+security definer
+set search_path = public, extensions, pg_catalog
+as $$
+declare
+  v_state public.study_timer_state%rowtype;
+begin
+  if not public.is_admin_token(p_token) then
+    raise exception 'Session admin invalide';
+  end if;
+  select * into v_state from public.study_timer_state where id=1;
+  if v_state.session_id is null then
+    raise exception 'Aucune session en cours';
+  end if;
+  return public.admin_timer_end_safe(
+    p_token,
+    v_state.session_id,
+    p_page_number,
+    p_note,
+    v_state.started_at,
+    coalesce(v_state.accumulated_seconds,0)
+  );
+end;
+$$;
+
+grant execute on function public.admin_timer_end(text,integer,text) to anon;
+
+-- ============================================================
+-- END v52 TIMER RECOVERY / HARDENING
+-- ============================================================
+

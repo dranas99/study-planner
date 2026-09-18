@@ -9,3 +9,7 @@ Final hardening pass:
 - Restore clears only future Day Off markers.
 - Existing Undo, Day Off, timer, Drive links, login, viewer mode and monthly calendar are preserved.
 - The ZIP contains one `supabase.sql`.
+
+
+### Correctifs v51
+Le chronomètre dispose maintenant d’un panneau visible avec Démarrer / Pause / Reprendre / Terminer. Un même cours peut être planifié plusieurs fois.

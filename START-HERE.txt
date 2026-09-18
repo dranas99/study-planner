@@ -1,7 +1,14 @@
-1. Supabase -> SQL Editor -> New query
-2. Copier tout le supabase.sql -> Run
-3. Ouvrir index.html et tester
-4. Créer un dépôt GitHub
-5. Envoyer index.html + app.js + style.css (+ README)
-6. GitHub -> Settings -> Pages -> main / root -> Save
-7. Ouvrir l'URL GitHub Pages
+STUDY PLANNER v51 — START HERE
+
+IMPORTANT
+- Existing Supabase data are NOT replaced by updating the website files.
+- For an existing installation, upload only index.html, app.js and style.css to GitHub.
+- DO NOT re-run supabase.sql unless you are installing the project from scratch.
+
+v51 fixes
+1. Chronomètre: visible control panel with Démarrer / Pause / Reprendre / Terminer.
+2. Chronomètre: safer server-side guards are included in supabase.sql for future fresh installs.
+3. Course scheduling: the same course can now be scheduled multiple times (2x, 3x, etc.), including multiple sessions on the same day.
+4. New course: the session popup now has an explicit button to create a new course.
+5. Timer UI is mobile-friendly and visible in read-only mode while a session is running.
+6. App JS syntax checked with Node.js.

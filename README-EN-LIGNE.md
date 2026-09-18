@@ -53,3 +53,9 @@ Pour une future mise à jour :
 - recharger le site.
 
 Ne relancer le SQL que si la nouvelle version contient réellement une modification de la base.
+
+
+## v51
+- Chronomètre visible et contrôlable directement depuis l'interface.
+- Un même cours peut être planifié plusieurs fois (doublon, triple, etc.), y compris le même jour.
+- La base Supabase est conservée; ne réexécutez pas le SQL sauf pour une installation complète.

@@ -3,12 +3,12 @@ const SUPABASE_ANON_KEY='sb_publishable_n655g8Etm2OOWj6CEioHCA_91FoJZnb';
 const sb=window.supabase.createClient(SUPABASE_URL,SUPABASE_ANON_KEY);
 
 const state={
-  subjects:[], courses:[], sessions:[],
+  subjects:[], courses:[], sessions:[], timeLogs:[],
   settings:{start_date:'2026-09-17',offline_day:2,allow_weekends:true},
   month:new Date(2026,8,1), selectedSubject:'all', calendarView:(window.innerWidth<=700?'week':'month'), weekAnchor:new Date(2026,8,17),
   adminToken:localStorage.getItem('studyPlannerAdminToken')||'', viewerMode:false,
   timer:{id:1,status:'idle',session_id:null,course_id:null,started_at:null,accumulated_seconds:0},
-  timerTicker:null, timerPollTick:0, dayOffs:new Set(), canUndo:false, undoLabel:'', timerRecovery:false
+  timerTicker:null, timerPollTick:0, dayOffs:new Set(), canUndo:false, undoLabel:'', timerRecovery:false, timerDialogSessionId:null
 };
 const $=id=>document.getElementById(id);
 const pad=n=>String(n).padStart(2,'0');
@@ -106,17 +106,19 @@ function reconcileTimer(serverTimer){
 }
 async function load(){
  oneTimeTimerUiReset();
- const [a,b,c,d,t,o]=await Promise.all([
+ const [a,b,c,d,t,o,l]=await Promise.all([
   sb.from('subjects').select('*').order('sort_order').order('name'),
   sb.from('courses_v2').select('*').order('global_order', {ascending:true, nullsFirst:false}).order('sort_order'),
   sb.from('study_sessions_v2').select('*').order('study_date'),
   sb.from('planner_settings').select('*').eq('id',1).single(),
   sb.from('study_timer_state').select('*').eq('id',1).single(),
-  sb.from('planner_day_offs').select('off_date')
+  sb.from('planner_day_offs').select('off_date'),
+  sb.from('study_time_logs').select('*').order('ended_at',{ascending:false})
  ]);
- const err=a.error||b.error||c.error||d.error||t.error||o.error;
+ const err=a.error||b.error||c.error||d.error||t.error||o.error||l.error;
  if(err){console.error(err);setSaveState('● Erreur',false);return false}
  state.subjects=a.data||[]; state.courses=b.data||[]; state.sessions=c.data||[]; state.settings=d.data||state.settings;
+ state.timeLogs=l.data||[];
  state.timer=reconcileTimer(t.data);
  state.dayOffs=new Set((o.data||[]).map(x=>String(x.off_date)));
  if(state.settings?.start_date && !sessionStorage.getItem('plannerMonthInitialized')){
@@ -144,25 +146,119 @@ function fmtTimer(sec){
 }
 function timerSession(){return state.sessions.find(s=>String(s.id)===String(state.timer?.session_id));}
 function timerCourse(){const s=timerSession();return courseById(state.timer?.course_id||s?.course_id);}
+
+function timeLogsForSession(sessionId){
+  return state.timeLogs.filter(l=>String(l.session_id)===String(sessionId)).sort((a,b)=>String(b.ended_at||'').localeCompare(String(a.ended_at||'')));
+}
+function totalLoggedSecondsForSession(sessionId){
+  return timeLogsForSession(sessionId).reduce((sum,l)=>sum+Math.max(0,Number(l.studied_seconds||0)),0);
+}
+function fmtLogDate(iso){
+  if(!iso) return '—';
+  const d=new Date(iso);
+  return Number.isNaN(d.getTime())?'—':d.toLocaleString('fr-FR',{day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'});
+}
+function sessionHasRecordedChronos(sessionId){return timeLogsForSession(sessionId).length>0;}
+function isTimerActiveForSession(sessionId){
+  return String(state.timer?.session_id||'')===String(sessionId||'') && ['running','paused'].includes(state.timer?.status);
+}
 function renderStudyTimer(){
   const t=state.timer||{}, s=timerSession(), c=timerCourse();
   const bar=$('studyTimerBar');
   if(!$('studyTimerTitle')) return;
   const active=t.status==='running'||t.status==='paused';
-  // The timer bar is only part of the header while a timer is active or recoverable.
-  // When a session is ended, it disappears completely from the header.
   bar?.classList.toggle('hidden', !(active || state.timerRecovery));
-  $('studyTimerTitle').textContent=active&&c?c.title:'Aucun chronomètre en cours';
+  $('studyTimerTitle').textContent=active&&c?`⏱ ${c.title}`:'Aucun chronomètre en cours';
   $('studyTimerSub').textContent=active&&c&&s
     ? `${subjectName(c.subject_id)} · ${fmtLong(parseDate(s.study_date))} · ${t.status==='running'?'En cours':'En pause'}`
-    : (isAdmin() ? (state.timerRecovery?'⚠️ Chrono récupérable depuis ce navigateur. Tu peux le terminer.':'L’administrateur peut démarrer une session d’étude.') : 'Aucune session chronométrée en cours.');
+    : 'Le chrono est géré depuis la fenêtre de la séance.';
   $('studyTimerClock').textContent=fmtTimer(timerSeconds());
   $('studyTimerDot').className=`study-timer-dot ${t.status||'idle'}`;
-  $('timerStartBtn')?.classList.toggle('hidden',!isAdmin()||active);
-  $('timerPauseBtn')?.classList.toggle('hidden',!isAdmin()||t.status!=='running');
-  $('timerResumeBtn')?.classList.toggle('hidden',!isAdmin()||t.status!=='paused');
-  $('timerEndBtn')?.classList.toggle('hidden',!isAdmin()||!active);
+  $('timerStartBtn')?.classList.add('hidden');
+  $('timerPauseBtn')?.classList.add('hidden');
+  $('timerResumeBtn')?.classList.add('hidden');
+  $('timerEndBtn')?.classList.add('hidden');
+  const openBtn=$('timerOpenPopupBtn');
+  openBtn?.classList.toggle('hidden',!isAdmin()||!active);
 }
+function renderSessionTimerDialog(sessionId){
+  const s=state.sessions.find(x=>String(x.id)===String(sessionId));
+  if(!s)return;
+  const c=courseById(s.course_id);
+  const active=isTimerActiveForSession(sessionId);
+  const otherActive=Boolean(state.timer?.session_id && !active && ['running','paused'].includes(state.timer.status));
+  const logs=timeLogsForSession(sessionId);
+  const total=totalLoggedSecondsForSession(sessionId);
+  const current=active?timerSeconds():0;
+  const hasLogs=logs.length>0;
+  $('sessionTimerTitle').textContent=c?.title||'Chronomètre';
+  $('sessionTimerSub').textContent=`${subjectName(c?.subject_id)} · ${fmtLong(parseDate(s.study_date))}`;
+  $('sessionTimerClock').textContent=fmtTimer(current);
+  $('sessionTimerStatus').textContent=active
+    ? (state.timer.status==='running'?'● En cours':'Ⅱ En pause')
+    : (hasLogs?'Historique disponible':'Aucune session enregistrée');
+  $('sessionTimerStatus').className=`timer-popup-status ${active?state.timer.status:'idle'}`;
+  $('sessionTimerTotal').textContent=`Total enregistré : ${fmtTimer(total)}`;
+  const startBtn=$('sessionTimerStartBtn'), pauseBtn=$('sessionTimerPauseBtn'), resumeBtn=$('sessionTimerResumeBtn'), endBtn=$('sessionTimerEndBtn');
+  startBtn.classList.toggle('hidden',active||otherActive);
+  resumeBtn.classList.toggle('hidden',!(active&&state.timer.status==='paused'));
+  pauseBtn.classList.toggle('hidden',!(active&&state.timer.status==='running'));
+  endBtn.classList.toggle('hidden',!active);
+  startBtn.disabled=otherActive;
+  startBtn.textContent=hasLogs?'▶ Reprendre le chrono':'▶ Démarrer le chrono';
+  resumeBtn.textContent='▶ Reprendre';
+  $('sessionTimerOtherWarning').textContent=otherActive?'Un autre chronomètre est actuellement en cours sur une autre séance.':'';
+  $('sessionTimerLogs').innerHTML=logs.length?logs.map(l=>{
+    const mins=fmtTimer(Number(l.studied_seconds||0));
+    const details=[fmtLogDate(l.started_at)+' → '+fmtLogDate(l.ended_at), l.page_number?`page ${esc(l.page_number)}`:'', l.note?esc(l.note):''].filter(Boolean).join(' · ');
+    return `<div class="timer-log-row"><div class="timer-log-main"><strong>${mins}</strong><span>${details}</span></div><button type="button" class="danger timer-log-delete" onclick="deleteTimeLog('${l.id}','${sessionId}')">Supprimer</button></div>`;
+  }).join(''):`<div class="timer-empty">Aucun chrono enregistré pour cette séance.</div>`;
+  const clearBtn=$('clearSessionTimerLogsBtn');
+  clearBtn.classList.toggle('hidden',!logs.length);
+  clearBtn.textContent=`Supprimer l’historique (${logs.length})`;
+  $('sessionTimerDialog').classList.toggle('timer-other-active',otherActive);
+}
+function openSessionTimer(sessionId){
+  if(!adminGuard())return;
+  state.timerDialogSessionId=sessionId;
+  renderSessionTimerDialog(sessionId);
+  $('sessionTimerDialog').showModal();
+}
+function closeSessionTimer(){state.timerDialogSessionId=null;$('sessionTimerDialog')?.close();}
+function hasLogsForTimerDialog(){return state.timerDialogSessionId?sessionHasRecordedChronos(state.timerDialogSessionId):false;}
+
+async function sessionTimerStart(){
+  if(!state.timerDialogSessionId)return;
+  await startTimerForSession(state.timerDialogSessionId,true);
+}
+async function sessionTimerPause(){await pauseTimer(true);}
+async function sessionTimerResume(){await resumeTimer(true);}
+function sessionTimerEnd(){openTimerEnd();}
+
+async function deleteTimeLog(logId,sessionId){
+  if(!adminGuard())return;
+  if(!confirm('Supprimer ce chrono enregistré ? Cette action est définitive.'))return;
+  setSaveState('● Suppression du chrono…',true);
+  const {data,error}=await sb.rpc('admin_delete_time_log',{p_token:state.adminToken,p_log_id:logId});
+  if(error){adminError(error);return;}
+  await load(); render();
+  if($('sessionTimerDialog')?.open) { state.timerDialogSessionId=sessionId; renderSessionTimerDialog(sessionId); }
+  setSaveState(`● Chrono supprimé (${fmtTimer(Number(data?.deleted_seconds||0))})`,true);
+}
+async function clearSessionTimerLogs(){
+  if(!adminGuard()||!state.timerDialogSessionId)return;
+  const sessionId=state.timerDialogSessionId;
+  const logs=timeLogsForSession(sessionId);
+  if(!logs.length)return;
+  if(!confirm(`Supprimer les ${logs.length} chronos enregistrés pour cette séance ? Cette action est définitive.`))return;
+  setSaveState('● Suppression de l’historique…',true);
+  const {data,error}=await sb.rpc('admin_delete_time_logs_for_session',{p_token:state.adminToken,p_session_id:sessionId});
+  if(error){adminError(error);return;}
+  await load(); render();
+  if($('sessionTimerDialog')?.open){renderSessionTimerDialog(sessionId);}
+  setSaveState(`● Historique supprimé (${fmtTimer(Number(data?.deleted_seconds||0))})`,true);
+}
+
 function startTimerDialog(){
   if(!adminGuard()) return;
   if(['running','paused'].includes(state.timer?.status)){
@@ -183,7 +279,7 @@ function startTimerDialog(){
   }).join(''):'<div class="calendar-empty">Aucune séance à étudier. Ajoute d’abord une séance au calendrier.</div>';
   $('timerStartDialog').showModal();
 }
-async function startTimerForSession(sessionId){
+async function startTimerForSession(sessionId,keepSessionTimerPopup=false){
   if(!adminGuard()) return;
   const session=state.sessions.find(s=>String(s.id)===String(sessionId));
   if(!session){alert('Séance introuvable.');return;}
@@ -199,9 +295,10 @@ async function startTimerForSession(sessionId){
   if(error){adminError(error);return;}
   if(data?.status){ state.timer={...state.timer,status:data.status,session_id:data.session_id||sessionId,course_id:data.course_id||session.course_id,started_at:data.started_at||new Date().toISOString(),accumulated_seconds:Number(data.accumulated_seconds||0)}; state.timerRecovery=false; writeTimerBackup(state.timer); }
   $('timerStartDialog')?.close();
-  $('detailDialog')?.close();
+  if(!keepSessionTimerPopup) $('detailDialog')?.close();
   await load();
   render();
+  if(keepSessionTimerPopup && $('sessionTimerDialog')?.open){ renderSessionTimerDialog(sessionId); }
   ensureTimerTicker();
   setSaveState('● Chrono en cours',true);
 }
@@ -211,7 +308,9 @@ async function pauseTimer(){
   if(error){adminError(error);return;}
   if(data?.status){ state.timer={...state.timer,status:data.status,started_at:null}; writeTimerBackup(state.timer); }
   renderStudyTimer();
-  await load(); render(); setSaveState('● Chrono en pause',true);
+  await load(); render();
+  if($('sessionTimerDialog')?.open && state.timerDialogSessionId){renderSessionTimerDialog(state.timerDialogSessionId);}
+  setSaveState('● Chrono en pause',true);
 }
 async function resumeTimer(){
   if(!adminGuard()) return;
@@ -219,7 +318,9 @@ async function resumeTimer(){
   if(error){adminError(error);return;}
   if(data?.status){ state.timer={...state.timer,status:data.status,started_at:new Date().toISOString()}; writeTimerBackup(state.timer); }
   renderStudyTimer();
-  await load(); render(); ensureTimerTicker(); setSaveState('● Chrono en cours',true);
+  await load(); render(); ensureTimerTicker();
+  if($('sessionTimerDialog')?.open && state.timerDialogSessionId){renderSessionTimerDialog(state.timerDialogSessionId);}
+  setSaveState('● Chrono en cours',true);
 }
 function openTimerEnd(){
   if(!adminGuard()) return;
@@ -252,7 +353,9 @@ async function endTimer(e){
   if(error){$('timerEndMessage').textContent=error.message;return;}
   clearTimerBackup();
   $('timerEndDialog').close();
+  const finishedSessionId=state.timerDialogSessionId||t.session_id;
   await load(); render();
+  if(finishedSessionId && $('sessionTimerDialog')?.open){renderSessionTimerDialog(finishedSessionId);}
   const suffix=data?.recovered_from_client?' · synchronisé depuis le navigateur':'';
   setSaveState(`● Session enregistrée (${fmtTimer(Number(data?.studied_seconds||0))})${suffix}`,true);
 }
@@ -599,12 +702,14 @@ function openSession(id){
  ${s.notes?`<p class="detail-notes">${esc(s.notes)}</p>`:''}`;
  const dayOffBtn=isAdmin()?`<button type="button" class="danger" onclick="toggleDayOff('${s.study_date}');$('detailDialog').close()">🏖 Mettre le ${fmtLong(parseDate(s.study_date))} en Day Off et décaler le planning</button>`:'';
  const sameDayNext=s.completed?`<button type="button" class="primary" onclick="startAnotherCourseToday('${s.id}')">＋ Commencer un autre cours aujourd’hui</button>`:'';
- const timerActive=state.timer?.session_id && String(state.timer.session_id)===String(s.id) && ['running','paused'].includes(state.timer.status);
- const timerOtherActive=state.timer?.session_id && !timerActive && ['running','paused'].includes(state.timer.status);
+ const timerActive=isTimerActiveForSession(s.id);
+ const timerOtherActive=Boolean(state.timer?.session_id && !timerActive && ['running','paused'].includes(state.timer.status));
+ const hasHistory=sessionHasRecordedChronos(s.id);
+ const timerLabel=timerActive
+   ? `⏱ ${state.timer.status==='paused'?'Reprendre':'Ouvrir'} le chrono`
+   : (hasHistory ? '▶ Reprendre le chrono' : '▶ Démarrer le chrono');
  const timerBtn=isAdmin()
-   ? (timerActive
-      ? `<button type="button" class="primary detail-timer-btn" onclick="openTimerEnd()">⏱ Chrono sur ce cours — ${state.timer.status==='running'?'en cours':'en pause'}</button>`
-      : `<button type="button" class="primary detail-timer-btn" onclick="startTimerForSession('${s.id}')" ${timerOtherActive?'disabled title="Un autre chrono est déjà en cours"':''}>▶ Démarrer le chrono sur ce cours</button>`)
+   ? `<button type="button" class="primary detail-timer-btn" onclick="openSessionTimer('${s.id}')" ${timerOtherActive?'disabled title="Un autre chrono est déjà en cours"':''}>${timerLabel}</button>`
    : '';
  $('detailActions').innerHTML=isAdmin()?`${timerBtn}${dayOffBtn}${sameDayNext}<button type="button" class="primary" onclick="editCourseFromSession('${s.id}')">Modifier le cours</button><button type="button" class="secondary" onclick="editSession('${s.id}')">Modifier la séance</button><button type="button" class="danger" onclick="deleteSession('${s.id}')">Supprimer la séance</button><button type="button" class="secondary" data-close="detailDialog">Fermer</button>`:`<button type="button" class="secondary" data-close="detailDialog">Fermer</button>`;
  $('detailDialog').showModal();

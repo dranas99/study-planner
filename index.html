@@ -261,10 +261,7 @@ html[data-theme="dark"] .day-off-cell{
         </div>
         <div class="study-timer-clock" id="studyTimerClock">00:00:00</div>
         <div class="study-timer-actions">
-          <button id="timerStartBtn" class="secondary admin-only" type="button" onclick="startTimerDialog()">▶ Démarrer</button>
-          <button id="timerPauseBtn" class="secondary admin-only hidden" type="button" onclick="pauseTimer()">⏸ Pause</button>
-          <button id="timerResumeBtn" class="secondary admin-only hidden" type="button" onclick="resumeTimer()">▶ Reprendre</button>
-          <button id="timerEndBtn" class="primary admin-only hidden" type="button" onclick="openTimerEnd()">■ Terminer</button>
+          <button id="timerOpenPopupBtn" class="primary admin-only hidden" type="button" onclick="state.timerDialogSessionId=state.timer.session_id; openSessionTimer(state.timer.session_id)">⏱ Ouvrir le chrono</button>
         </div>
       </section>
       <div class="calendar-header card">
@@ -338,6 +335,30 @@ html[data-theme="dark"] .day-off-cell{
   </form></dialog>
 
   
+  <dialog id="sessionTimerDialog"><div class="dialog-card timer-popup-card wide-dialog">
+    <button type="button" class="close" onclick="closeSessionTimer()">×</button>
+    <div class="eyebrow">CHRONOMÈTRE DE LA SÉANCE</div>
+    <h3 id="sessionTimerTitle">Chronomètre</h3>
+    <p id="sessionTimerSub" class="muted"></p>
+    <div class="timer-popup-hero">
+      <div id="sessionTimerStatus" class="timer-popup-status idle">Aucune session enregistrée</div>
+      <div id="sessionTimerClock" class="timer-popup-clock">00:00:00</div>
+      <div id="sessionTimerTotal" class="timer-popup-total">Total enregistré : 00:00:00</div>
+    </div>
+    <div id="sessionTimerOtherWarning" class="message"></div>
+    <div class="timer-popup-actions">
+      <button id="sessionTimerStartBtn" type="button" class="primary">▶ Démarrer le chrono</button>
+      <button id="sessionTimerResumeBtn" type="button" class="primary hidden">▶ Reprendre</button>
+      <button id="sessionTimerPauseBtn" type="button" class="secondary hidden">⏸ Pause</button>
+      <button id="sessionTimerEndBtn" type="button" class="danger hidden">■ Terminer</button>
+    </div>
+    <div class="timer-history-head">
+      <div><strong>Chronos enregistrés</strong><small>Tu peux supprimer un chrono ou tout l’historique de cette séance.</small></div>
+      <button id="clearSessionTimerLogsBtn" type="button" class="danger hidden">Supprimer l’historique</button>
+    </div>
+    <div id="sessionTimerLogs" class="timer-log-list"></div>
+  </div></dialog>
+
   <dialog id="timerStartDialog"><div class="dialog-card wide-dialog">
     <button type="button" class="close" data-close="timerStartDialog">×</button>
     <div class="eyebrow">CHRONOMÈTRE</div>
@@ -425,6 +446,6 @@ html[data-theme="dark"] .day-off-cell{
   </div></dialog>
 
   </div>
-  <script src="app.js?v=54"></script>
+  <script src="app.js?v=56"></script>
 </body>
 </html>

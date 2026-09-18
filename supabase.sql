@@ -2128,16 +2128,97 @@ grant execute on function public.admin_timer_end(text,integer,text) to anon;
 
 
 -- ============================================================
--- v55 ONE-TIME TIMER RESET
+-- v56 SESSION TIMER POPUP + LOG MANAGEMENT
 -- ============================================================
--- Reset the current shared timer state only. Existing study_time_logs
--- are preserved. Run this version once to remove any stale active timer.
-update public.study_timer_state
-set status='idle',
-    session_id=null,
-    course_id=null,
-    started_at=null,
-    accumulated_seconds=0,
-    updated_at=now()
-where id=1;
--- END v55 ONE-TIME TIMER RESET
+
+create or replace function public.admin_delete_time_log(
+  p_token text,
+  p_log_id uuid
+)
+returns jsonb
+language plpgsql
+security definer
+set search_path = public, extensions, pg_catalog
+as $$
+declare
+  v_log public.study_time_logs%rowtype;
+  v_session_seconds integer := 0;
+begin
+  if not public.is_admin_token(p_token) then
+    raise exception 'Session admin invalide';
+  end if;
+
+  select * into v_log
+  from public.study_time_logs
+  where id=p_log_id;
+
+  if v_log.id is null then
+    raise exception 'Chrono enregistré introuvable';
+  end if;
+
+  delete from public.study_time_logs where id=p_log_id;
+
+  if v_log.session_id is not null then
+    select coalesce(sum(studied_seconds),0)
+    into v_session_seconds
+    from public.study_time_logs
+    where session_id=v_log.session_id;
+
+    update public.study_sessions_v2
+    set duration_min=case
+      when v_session_seconds>0 then greatest(1,ceil(v_session_seconds/60.0)::integer)
+      else 0
+    end
+    where id=v_log.session_id;
+  end if;
+
+  return jsonb_build_object(
+    'ok',true,
+    'deleted_seconds',greatest(0,v_log.studied_seconds),
+    'session_id',v_log.session_id
+  );
+end;
+$$;
+
+grant execute on function public.admin_delete_time_log(text,uuid) to anon;
+
+create or replace function public.admin_delete_time_logs_for_session(
+  p_token text,
+  p_session_id uuid
+)
+returns jsonb
+language plpgsql
+security definer
+set search_path = public, extensions, pg_catalog
+as $$
+declare
+  v_deleted_seconds integer := 0;
+  v_count integer := 0;
+begin
+  if not public.is_admin_token(p_token) then
+    raise exception 'Session admin invalide';
+  end if;
+
+  select coalesce(sum(studied_seconds),0), count(*)
+  into v_deleted_seconds, v_count
+  from public.study_time_logs
+  where session_id=p_session_id;
+
+  delete from public.study_time_logs where session_id=p_session_id;
+
+  update public.study_sessions_v2
+  set duration_min=0
+  where id=p_session_id;
+
+  return jsonb_build_object(
+    'ok',true,
+    'deleted_seconds',greatest(0,v_deleted_seconds),
+    'deleted_count',v_count,
+    'session_id',p_session_id
+  );
+end;
+$$;
+
+grant execute on function public.admin_delete_time_logs_for_session(text,uuid) to anon;
+
+-- END v56 SESSION TIMER POPUP + LOG MANAGEMENT

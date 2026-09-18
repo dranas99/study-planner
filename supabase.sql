@@ -2126,3 +2126,18 @@ grant execute on function public.admin_timer_end(text,integer,text) to anon;
 -- END v52 TIMER RECOVERY / HARDENING
 -- ============================================================
 
+
+-- ============================================================
+-- v55 ONE-TIME TIMER RESET
+-- ============================================================
+-- Reset the current shared timer state only. Existing study_time_logs
+-- are preserved. Run this version once to remove any stale active timer.
+update public.study_timer_state
+set status='idle',
+    session_id=null,
+    course_id=null,
+    started_at=null,
+    accumulated_seconds=0,
+    updated_at=now()
+where id=1;
+-- END v55 ONE-TIME TIMER RESET

@@ -12,3 +12,6 @@ v51 fixes
 4. New course: the session popup now has an explicit button to create a new course.
 5. Timer UI is mobile-friendly and visible in read-only mode while a session is running.
 6. App JS syntax checked with Node.js.
+
+
+V55 CHRONO RESET: execute this supabase.sql once. It resets only the current shared timer state to idle and preserves all study_time_logs. Then refresh the site.

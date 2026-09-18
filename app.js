@@ -24,6 +24,15 @@ const courseStatus=c=>{const ss=sessionsForCourse(c.id);return ss.length&&ss.eve
 const fmtLong=d=>d.toLocaleDateString('fr-FR',{weekday:'long',day:'numeric',month:'long',year:'numeric'});
 
 const TIMER_BACKUP_KEY='studyPlannerTimerBackup';
+const TIMER_RESET_UI_KEY='studyPlannerTimerResetV55';
+function oneTimeTimerUiReset(){
+  try{
+    if(localStorage.getItem(TIMER_RESET_UI_KEY)!=='1'){
+      localStorage.removeItem(TIMER_BACKUP_KEY);
+      localStorage.setItem(TIMER_RESET_UI_KEY,'1');
+    }
+  }catch{}
+}
 const THEME_KEY='studyPlannerTheme';
 function getThemePreference(){return localStorage.getItem(THEME_KEY)||'auto';}
 function applyThemePreference(){
@@ -96,6 +105,7 @@ function reconcileTimer(serverTimer){
   return server;
 }
 async function load(){
+ oneTimeTimerUiReset();
  const [a,b,c,d,t,o]=await Promise.all([
   sb.from('subjects').select('*').order('sort_order').order('name'),
   sb.from('courses_v2').select('*').order('global_order', {ascending:true, nullsFirst:false}).order('sort_order'),

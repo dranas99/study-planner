@@ -59,3 +59,13 @@ Ne relancer le SQL que si la nouvelle version contient réellement une modificat
 - Chronomètre visible et contrôlable directement depuis l'interface.
 - Un même cours peut être planifié plusieurs fois (doublon, triple, etc.), y compris le même jour.
 - La base Supabase est conservée; ne réexécutez pas le SQL sauf pour une installation complète.
+
+## v54 timer recovery
+If an old browser timer is visible while the shared timer state is idle, the app can recover it from the browser backup and finish it through `admin_timer_end_safe`. The UI no longer displays stale accumulated seconds while the timer is idle.
+If a stale timer state remains in Supabase from an earlier failed attempt, it is safe to reset only the singleton timer row with:
+```sql
+update public.study_timer_state
+set status='idle', session_id=null, course_id=null, started_at=null, accumulated_seconds=0, updated_at=now()
+where id=1;
+```
+This does not delete `study_time_logs`.

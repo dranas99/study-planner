@@ -13,3 +13,7 @@ Final hardening pass:
 
 ### Correctifs v51
 Le chronomètre dispose maintenant d’un panneau visible avec Démarrer / Pause / Reprendre / Terminer. Un même cours peut être planifié plusieurs fois.
+
+
+### v54
+Après la fin d'une session chronométrée, la barre du chronomètre disparaît immédiatement de l'en-tête. Elle réapparaît automatiquement au prochain démarrage ou en cas de récupération d'un chronomètre actif.

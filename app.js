@@ -8,7 +8,7 @@ const state={
   month:new Date(2026,8,1), selectedSubject:'all', calendarView:(window.innerWidth<=700?'week':'month'), weekAnchor:new Date(2026,8,17),
   adminToken:localStorage.getItem('studyPlannerAdminToken')||'', viewerMode:false,
   timer:{id:1,status:'idle',session_id:null,course_id:null,started_at:null,accumulated_seconds:0},
-  timerTicker:null, timerPollTick:0, dayOffs:new Set(), canUndo:false, undoLabel:''
+  timerTicker:null, timerPollTick:0, dayOffs:new Set(), canUndo:false, undoLabel:'', timerRecovery:false
 };
 const $=id=>document.getElementById(id);
 const pad=n=>String(n).padStart(2,'0');
@@ -23,6 +23,7 @@ const sessionsForCourse=id=>state.sessions.filter(s=>Number(s.course_id)===Numbe
 const courseStatus=c=>{const ss=sessionsForCourse(c.id);return ss.length&&ss.every(x=>x.completed)?'done':ss.length?'active':'todo'};
 const fmtLong=d=>d.toLocaleDateString('fr-FR',{weekday:'long',day:'numeric',month:'long',year:'numeric'});
 
+const TIMER_BACKUP_KEY='studyPlannerTimerBackup';
 const THEME_KEY='studyPlannerTheme';
 function getThemePreference(){return localStorage.getItem(THEME_KEY)||'auto';}
 function applyThemePreference(){
@@ -58,6 +59,42 @@ async function ensureAllCoursesHaveSession(){
   if(data?.added) await load();
 }
 
+function readTimerBackup(){
+  try{
+    const raw=localStorage.getItem(TIMER_BACKUP_KEY);
+    if(!raw) return null;
+    const t=JSON.parse(raw);
+    if(!t || !['running','paused'].includes(t.status) || !t.session_id) return null;
+    return t;
+  }catch{return null;}
+}
+function writeTimerBackup(t){
+  if(!t || !['running','paused'].includes(t.status) || !t.session_id){localStorage.removeItem(TIMER_BACKUP_KEY);return;}
+  localStorage.setItem(TIMER_BACKUP_KEY,JSON.stringify({
+    session_id:t.session_id, course_id:t.course_id||null, status:t.status,
+    started_at:t.started_at||null, accumulated_seconds:Math.max(0,Number(t.accumulated_seconds||0)),
+    saved_at:new Date().toISOString()
+  }));
+}
+function clearTimerBackup(){localStorage.removeItem(TIMER_BACKUP_KEY); state.timerRecovery=false;}
+function reconcileTimer(serverTimer){
+  const server=serverTimer||{id:1,status:'idle',session_id:null,course_id:null,started_at:null,accumulated_seconds:0};
+  if(['running','paused'].includes(server.status)){
+    state.timerRecovery=false; writeTimerBackup(server); return server;
+  }
+  const backup=readTimerBackup();
+  if(backup){
+    const s=state.sessions.find(x=>String(x.id)===String(backup.session_id));
+    const age=backup.saved_at?Date.now()-Date.parse(backup.saved_at):0;
+    if(s && !s.completed && age>=0 && age<72*3600*1000){
+      state.timerRecovery=true;
+      return {id:1,status:backup.status,session_id:backup.session_id,course_id:backup.course_id||s.course_id,started_at:backup.started_at||null,accumulated_seconds:Number(backup.accumulated_seconds||0)};
+    }
+    clearTimerBackup();
+  }
+  state.timerRecovery=false;
+  return server;
+}
 async function load(){
  const [a,b,c,d,t,o]=await Promise.all([
   sb.from('subjects').select('*').order('sort_order').order('name'),
@@ -68,9 +105,9 @@ async function load(){
   sb.from('planner_day_offs').select('off_date')
  ]);
  const err=a.error||b.error||c.error||d.error||t.error||o.error;
- if(err){console.error(err);setSaveState('● Erreur',false);alert('Erreur Supabase : '+err.message);return false}
+ if(err){console.error(err);setSaveState('● Erreur',false);return false}
  state.subjects=a.data||[]; state.courses=b.data||[]; state.sessions=c.data||[]; state.settings=d.data||state.settings;
- state.timer=t.data||{id:1,status:'idle',session_id:null,course_id:null,started_at:null,accumulated_seconds:0};
+ state.timer=reconcileTimer(t.data);
  state.dayOffs=new Set((o.data||[]).map(x=>String(x.off_date)));
  if(state.settings?.start_date && !sessionStorage.getItem('plannerMonthInitialized')){
    const start=parseDate(state.settings.start_date); state.month=new Date(start.getFullYear(),start.getMonth(),1); sessionStorage.setItem('plannerMonthInitialized','1');
@@ -82,6 +119,7 @@ function render(){renderAdminState();renderStudyTimer();renderMonthStrip();rende
 
 function timerSeconds(){
   const t=state.timer||{};
+  if(!['running','paused'].includes(t.status)) return 0;
   let sec=Number(t.accumulated_seconds||0);
   if(t.status==='running' && t.started_at){
     const started=Date.parse(t.started_at);
@@ -98,12 +136,16 @@ function timerSession(){return state.sessions.find(s=>String(s.id)===String(stat
 function timerCourse(){const s=timerSession();return courseById(state.timer?.course_id||s?.course_id);}
 function renderStudyTimer(){
   const t=state.timer||{}, s=timerSession(), c=timerCourse();
+  const bar=$('studyTimerBar');
   if(!$('studyTimerTitle')) return;
   const active=t.status==='running'||t.status==='paused';
+  // The timer bar is only part of the header while a timer is active or recoverable.
+  // When a session is ended, it disappears completely from the header.
+  bar?.classList.toggle('hidden', !(active || state.timerRecovery));
   $('studyTimerTitle').textContent=active&&c?c.title:'Aucun chronomètre en cours';
   $('studyTimerSub').textContent=active&&c&&s
     ? `${subjectName(c.subject_id)} · ${fmtLong(parseDate(s.study_date))} · ${t.status==='running'?'En cours':'En pause'}`
-    : (isAdmin()?'L’administrateur peut démarrer une session d’étude.':'Aucune session chronométrée en cours.');
+    : (isAdmin() ? (state.timerRecovery?'⚠️ Chrono récupérable depuis ce navigateur. Tu peux le terminer.':'L’administrateur peut démarrer une session d’étude.') : 'Aucune session chronométrée en cours.');
   $('studyTimerClock').textContent=fmtTimer(timerSeconds());
   $('studyTimerDot').className=`study-timer-dot ${t.status||'idle'}`;
   $('timerStartBtn')?.classList.toggle('hidden',!isAdmin()||active);
@@ -145,7 +187,7 @@ async function startTimerForSession(sessionId){
   setSaveState('● Démarrage du chrono…',true);
   const {data,error}=await sb.rpc('admin_timer_start',{p_token:state.adminToken,p_session_id:sessionId});
   if(error){adminError(error);return;}
-  if(data?.status) state.timer={...state.timer,status:data.status,session_id:data.session_id||sessionId,course_id:data.course_id||session.course_id,started_at:data.started_at||new Date().toISOString(),accumulated_seconds:Number(data.accumulated_seconds||0)};
+  if(data?.status){ state.timer={...state.timer,status:data.status,session_id:data.session_id||sessionId,course_id:data.course_id||session.course_id,started_at:data.started_at||new Date().toISOString(),accumulated_seconds:Number(data.accumulated_seconds||0)}; state.timerRecovery=false; writeTimerBackup(state.timer); }
   $('timerStartDialog')?.close();
   $('detailDialog')?.close();
   await load();
@@ -157,7 +199,7 @@ async function pauseTimer(){
   if(!adminGuard()) return;
   const {data,error}=await sb.rpc('admin_timer_pause',{p_token:state.adminToken});
   if(error){adminError(error);return;}
-  if(data?.status) state.timer={...state.timer,status:data.status,started_at:null};
+  if(data?.status){ state.timer={...state.timer,status:data.status,started_at:null}; writeTimerBackup(state.timer); }
   renderStudyTimer();
   await load(); render(); setSaveState('● Chrono en pause',true);
 }
@@ -165,7 +207,7 @@ async function resumeTimer(){
   if(!adminGuard()) return;
   const {data,error}=await sb.rpc('admin_timer_resume',{p_token:state.adminToken});
   if(error){adminError(error);return;}
-  if(data?.status) state.timer={...state.timer,status:data.status,started_at:new Date().toISOString()};
+  if(data?.status){ state.timer={...state.timer,status:data.status,started_at:new Date().toISOString()}; writeTimerBackup(state.timer); }
   renderStudyTimer();
   await load(); render(); ensureTimerTicker(); setSaveState('● Chrono en cours',true);
 }
@@ -198,6 +240,7 @@ async function endTimer(e){
     p_client_accumulated_seconds:clientAccumulatedSeconds
   });
   if(error){$('timerEndMessage').textContent=error.message;return;}
+  clearTimerBackup();
   $('timerEndDialog').close();
   await load(); render();
   const suffix=data?.recovered_from_client?' · synchronisé depuis le navigateur':'';
@@ -205,7 +248,7 @@ async function endTimer(e){
 }
 async function refreshTimerOnly(){
   const {data,error}=await sb.from('study_timer_state').select('*').eq('id',1).single();
-  if(!error&&data){state.timer=data;renderStudyTimer();}
+  if(!error){state.timer=reconcileTimer(data);renderStudyTimer();}
 }
 function ensureTimerTicker(){
   if(state.timerTicker) return;
